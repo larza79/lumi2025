@@ -1,0 +1,45 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lumi-backend-dev
+    ports:
+      - "8888:8888"
+    environment:
+      - DEVELOPMENT=true
+    networks:
+      - lumi-network
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/lumi-api", "--health-check"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+    # For development, you might want to mount source code for hot reloading
+    # Uncomment the following lines if you set up hot reloading in the Go app
+    # volumes:
+    #   - ./backend:/app:ro
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lumi-frontend-dev
+    ports:
+      - "3000:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - lumi-network
+    restart: unless-stopped
+    # For development, you might want to mount source files for live editing
+    # Uncomment the following lines if you want to edit frontend files without rebuilding
+    # volumes:
+    #   - ./frontend/src:/usr/share/nginx/html:ro
+
+networks:
+  lumi-network:
+    driver: bridge

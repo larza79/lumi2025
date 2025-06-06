@@ -9,6 +9,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
         }
         .priority-btn-group .btn-selected {
             background-color: #4F46E5;
@@ -17,32 +18,80 @@
         .add-btn.added {
             background-color: #10B981;
             color: white;
-            /* Make it a square to nicely fit the checkmark icon */
-            width: 34px; /* Same as height for a square shape */
+            width: 34px;
             height: 34px;
-            padding: 0; /* Remove padding to use flex centering */
+            padding: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 0.375rem; /* rounded-md */
-            transition: all 0.2s; /* Smooth transition */
+            border-radius: 0.375rem;
+            transition: all 0.2s;
         }
         .add-btn.added:hover {
             transform: scale(1.05);
         }
+
+        /* --- Dark Mode Styles --- */
+        .dark body {
+            background-color: #111827; /* gray-900 */
+            color: #D1D5DB; /* gray-300 */
+        }
+        .dark .card {
+            background-color: #1F2937; /* gray-800 */
+            border-color: #374151; /* gray-700 */
+        }
+        .dark .text-indigo-600 {
+            color: #818CF8; /* indigo-400 */
+        }
+        .dark .text-gray-600 {
+            color: #9CA3AF; /* gray-400 */
+        }
+        .dark .border-b {
+            border-color: #374151; /* gray-700 */
+        }
+        .dark .concert-item:hover {
+            background-color: #374151; /* gray-700 */
+        }
+        .dark .day-header {
+             background-color: #1F2937; /* gray-800 */
+        }
+        .dark .priority-btn {
+            background-color: #374151; /* gray-700 */
+            border-color: #4B5563; /* gray-600 */
+            color: #D1D5DB; /* gray-300 */
+        }
+        .dark .priority-btn.btn-selected {
+            background-color: #6366F1; /* indigo-500 */
+            color: white;
+        }
+        .dark .bg-green-100 { background-color: #042f2e; }
+        .dark .text-green-800 { color: #6ee7b7; }
+        .dark .text-green-700 { color: #a7f3d0; }
+        .dark .border-green-500 { border-color: #10b981; }
+
+        .dark .bg-red-100 { background-color: #450a0a; }
+        .dark .text-red-800 { color: #fca5a5; }
+        .dark .text-red-700 { color: #fecaca; }
+        .dark .text-red-600 { color: #f87171; }
+        .dark .border-red-500 { border-color: #ef4444; }
+
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
     <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <header class="text-center mb-8">
+        <header class="relative text-center mb-8">
             <h1 class="text-4xl sm:text-5xl font-bold text-indigo-600">Luminosity Beach Festival 2025</h1>
             <p class="mt-2 text-lg text-gray-600">Your Personal Concert Planner</p>
+            <button id="theme-toggle" class="absolute top-0 right-0 p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
+                <svg id="theme-icon-light" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                <svg id="theme-icon-dark" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Concert Selection Column -->
-            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg">
+            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg card">
                 <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Select Your Concerts</h2>
                 <div id="concert-list">
                     <!-- Concerts will be dynamically inserted here -->
@@ -51,7 +100,7 @@
 
             <!-- Itinerary Column -->
             <div class="lg:col-span-1">
-                <div class="sticky top-8 bg-white p-6 rounded-2xl shadow-lg">
+                <div class="sticky top-8 bg-white p-6 rounded-2xl shadow-lg card">
                     <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Your Itinerary</h2>
                     <div id="itinerary-list" class="space-y-4">
                         <p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>
@@ -222,13 +271,37 @@
 
 
         document.addEventListener('DOMContentLoaded', () => {
+            // --- Elements ---
             const concertListContainer = document.getElementById('concert-list');
             const itineraryListContainer = document.getElementById('itinerary-list');
             const clearPlanBtn = document.getElementById('clear-plan-btn');
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const lightIcon = document.getElementById('theme-icon-light');
+            const darkIcon = document.getElementById('theme-icon-dark');
+            const htmlEl = document.documentElement;
 
             let userSelections = [];
 
-            // --- LocalStorage Functions ---
+            // --- Theme Management ---
+            const applyTheme = (theme) => {
+                if (theme === 'dark') {
+                    htmlEl.classList.add('dark');
+                    darkIcon.classList.remove('hidden');
+                    lightIcon.classList.add('hidden');
+                } else {
+                    htmlEl.classList.remove('dark');
+                    lightIcon.classList.remove('hidden');
+                    darkIcon.classList.add('hidden');
+                }
+            };
+            
+            const toggleTheme = () => {
+                const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
+                localStorage.setItem('theme', newTheme);
+                applyTheme(newTheme);
+            };
+
+            // --- LocalStorage ---
             const saveSelections = () => {
                 localStorage.setItem('festivalPlannerSelections', JSON.stringify(userSelections));
             };
@@ -240,37 +313,31 @@
                 }
             };
 
-            // --- Helper Functions ---
+            // --- Helpers ---
             const timeToMinutes = (time) => {
                 const [hours, minutes] = time.split(':').map(Number);
                 return hours * 60 + minutes;
             };
+            const getDuration = (start, end) => timeToMinutes(end) - timeToMinutes(start);
 
-            const getDuration = (start, end) => {
-                return timeToMinutes(end) - timeToMinutes(start);
-            };
-
-            // Group concerts by day
+            // --- Data Processing ---
             const concertsByDay = concertData.reduce((acc, concert) => {
                 (acc[concert.day] = acc[concert.day] || []).push(concert);
                 return acc;
             }, {});
 
             // --- Render Functions ---
-
-            // Render the main concert list
             const renderConcertList = () => {
                 concertListContainer.innerHTML = '';
                 const checkMarkSVG = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
 
                 Object.keys(concertsByDay).forEach(day => {
                     const dayHeader = document.createElement('h3');
-                    dayHeader.className = 'text-xl font-bold mt-6 mb-3 bg-gray-200 p-2 rounded-md';
+                    dayHeader.className = 'day-header text-xl font-bold mt-6 mb-3 bg-gray-200 p-2 rounded-md';
                     dayHeader.textContent = `${day}, ${concertsByDay[day][0].date}`;
                     concertListContainer.appendChild(dayHeader);
 
-                    const concerts = concertsByDay[day];
-                    concerts.forEach((concert, index) => {
+                    concertsByDay[day].forEach((concert, index) => {
                         const concertId = `${day.replace(/\s+/g, '-')}-${index}`;
                         concert.id = concertId;
                         
@@ -278,7 +345,6 @@
                         concertEl.className = 'concert-item flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50 rounded-lg';
                         concertEl.dataset.id = concertId;
 
-                        const duration = getDuration(concert.startTime, concert.endTime);
                         const existingSelection = userSelections.find(s => s.id === concert.id);
                         const isAdded = !!existingSelection;
 
@@ -290,7 +356,7 @@
                         concertEl.innerHTML = `
                             <div class="flex-grow mb-2 sm:mb-0">
                                 <p class="font-semibold text-lg">${concert.artist} ${concert.notes ? `<span class="text-sm text-gray-500 font-normal">${concert.notes}</span>` : ''}</p>
-                                <p class="text-sm text-gray-600">${concert.startTime} - ${concert.endTime} (${duration} mins)</p>
+                                <p class="text-sm text-gray-600">${concert.startTime} - ${concert.endTime} (${getDuration(concert.startTime, concert.endTime)} mins)</p>
                                 <p class="text-sm text-indigo-500 font-medium">${concert.stage}</p>
                             </div>
                             <div class="flex items-center space-x-2">
@@ -306,15 +372,12 @@
                         
                         if (isAdded) {
                            const priorityButton = concertEl.querySelector(`.priority-btn[data-priority="${existingSelection.priority}"]`);
-                           if (priorityButton) {
-                               priorityButton.classList.add('btn-selected');
-                           }
+                           if (priorityButton) priorityButton.classList.add('btn-selected');
                         }
                     });
                 });
             };
             
-            // Main logic to update the itinerary
             const updateItinerary = () => {
                 if (userSelections.length === 0) {
                     itineraryListContainer.innerHTML = '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
@@ -329,39 +392,30 @@
                     return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
                 });
 
-                const finalPlan = [];
-                const rejectedPlan = [];
+                const finalPlan = [], rejectedPlan = [];
 
                 sortedSelections.forEach(currentConcert => {
                     let hasConflict = false;
                     const currentStart = timeToMinutes(currentConcert.startTime);
                     const currentEnd = timeToMinutes(currentConcert.endTime);
-
                     for (const plannedConcert of finalPlan) {
                         const plannedStart = timeToMinutes(plannedConcert.startTime);
                         const plannedEnd = timeToMinutes(plannedConcert.endTime);
-
                         const overlap = Math.max(0, Math.min(currentEnd, plannedEnd) - Math.max(currentStart, plannedStart));
                         if (overlap > 15) {
                             hasConflict = true;
                             break;
                         }
                     }
-
-                    if (!hasConflict) {
-                        finalPlan.push(currentConcert);
-                    } else {
-                        rejectedPlan.push({concert: currentConcert, reason: 'Conflict'});
-                    }
+                    if (!hasConflict) finalPlan.push(currentConcert);
+                    else rejectedPlan.push({concert: currentConcert, reason: 'Conflict'});
                 });
                 
                 renderItineraryUI(finalPlan, rejectedPlan);
             };
 
-            // Render the final itinerary UI
             const renderItineraryUI = (plan, rejected) => {
                 itineraryListContainer.innerHTML = '';
-                
                 plan.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
                 if(plan.length === 0 && rejected.length > 0) {
@@ -371,12 +425,11 @@
                 }
 
                 plan.forEach(concert => {
-                    const duration = getDuration(concert.startTime, concert.endTime);
                     const item = document.createElement('div');
                     item.className = 'p-3 bg-green-100 border-l-4 border-green-500 rounded-r-lg';
                     item.innerHTML = `
                         <p class="font-bold text-green-800">${concert.artist} (P${concert.priority})</p>
-                        <p class="text-sm text-green-700">${concert.day} | ${concert.startTime} - ${concert.endTime} (${duration} mins)</p>
+                        <p class="text-sm text-green-700">${concert.day} | ${concert.startTime} - ${concert.endTime} (${getDuration(concert.startTime, concert.endTime)} mins)</p>
                         <p class="text-sm text-green-700 font-medium">@ ${concert.stage}</p>
                     `;
                     itineraryListContainer.appendChild(item);
@@ -387,14 +440,12 @@
                     rejectedHeader.className = 'text-lg font-semibold mt-6 mb-2 text-red-600';
                     rejectedHeader.textContent = 'Skipped due to conflicts';
                     itineraryListContainer.appendChild(rejectedHeader);
-
                     rejected.forEach(item => {
-                         const duration = getDuration(item.concert.startTime, item.concert.endTime);
                          const rejectedItem = document.createElement('div');
                          rejectedItem.className = 'p-3 bg-red-100 border-l-4 border-red-500 rounded-r-lg opacity-70';
                          rejectedItem.innerHTML = `
                             <p class="font-bold text-red-800">${item.concert.artist} (P${item.concert.priority})</p>
-                            <p class="text-sm text-red-700">${item.concert.day} | ${item.concert.startTime} - ${item.concert.endTime} (${duration} mins)</p>
+                            <p class="text-sm text-red-700">${item.concert.day} | ${item.concert.startTime} - ${item.concert.endTime} (${getDuration(item.concert.startTime, item.concert.endTime)} mins)</p>
                             <p class="text-sm text-red-700 font-medium">@ ${item.concert.stage}</p>
                          `;
                          itineraryListContainer.appendChild(rejectedItem);
@@ -410,8 +461,7 @@
                 const concertId = button.dataset.concertId;
                 const concert = concertData.find(c => c.id === concertId);
                 const concertElement = button.closest('.concert-item');
-                const priorityGroup = concertElement.querySelector('.priority-btn-group');
-                const selectedPriorityBtn = priorityGroup.querySelector('.btn-selected');
+                const selectedPriorityBtn = concertElement.querySelector('.priority-btn-group .btn-selected');
                 
                 const existingSelectionIndex = userSelections.findIndex(s => s.id === concertId);
                 const checkMarkSVG = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
@@ -430,14 +480,12 @@
                     button.innerHTML = checkMarkSVG;
                     button.className = 'add-btn added';
                 }
-                
                 updateItinerary();
                 saveSelections();
             };
 
             const handlePriorityClick = (e) => {
                 if (!e.target.classList.contains('priority-btn')) return;
-
                 const parentGroup = e.target.parentElement;
                 parentGroup.querySelectorAll('.priority-btn').forEach(btn => btn.classList.remove('btn-selected'));
                 e.target.classList.add('btn-selected');
@@ -448,14 +496,17 @@
                 saveSelections();
                 renderConcertList();
                 updateItinerary();
-            }
+            };
 
             // --- Initialisation ---
+            const initialTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            applyTheme(initialTheme);
             loadSelections();
             renderConcertList();
             updateItinerary();
 
             // --- Event Listeners ---
+            themeToggleBtn.addEventListener('click', toggleTheme);
             concertListContainer.addEventListener('click', handleAddClick);
             concertListContainer.addEventListener('click', handlePriorityClick);
             clearPlanBtn.addEventListener('click', clearPlan);

@@ -28,6 +28,36 @@ docker-push: ## Push the Docker image to the registry.
 docker-run: docker-build ## Run the Docker image locally.
 	docker run -p 8080:8080 $(DOCKER_ORG)/$(PROJECTNAME):$(VERSION)
 
+##@ Docker Compose
+.PHONY: compose-up
+compose-up: ## Start all services with Docker Compose in production mode.
+	docker-compose up -d
+
+.PHONY: compose-dev
+compose-dev: ## Start all services with Docker Compose in development mode.
+	docker-compose -f docker-compose.dev.yml up -d
+
+.PHONY: compose-build
+compose-build: ## Build all Docker Compose services.
+	docker-compose build
+
+.PHONY: compose-build-dev
+compose-build-dev: ## Build all Docker Compose services for development.
+	docker-compose -f docker-compose.dev.yml build
+
+.PHONY: compose-down
+compose-down: ## Stop and remove all Docker Compose services.
+	docker-compose down
+	docker-compose -f docker-compose.dev.yml down
+
+.PHONY: compose-logs
+compose-logs: ## Show logs from all Docker Compose services.
+	docker-compose logs -f
+
+.PHONY: compose-logs-dev
+compose-logs-dev: ## Show logs from all Docker Compose services in development mode.
+	docker-compose -f docker-compose.dev.yml logs -f
+
 ##@ Helm
 .PHONY: helm-lint
 helm-lint: ## Lint the Helm chart.

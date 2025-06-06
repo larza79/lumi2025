@@ -1,0 +1,217 @@
+# ===========================================
+# Combined .gitignore for Go and Angular
+# ===========================================
+
+# ===========================================
+# Go specific ignores
+# ===========================================
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# Air live reload tool
+tmp/
+
+# Delve debugger
+__debug_bin*
+
+# ===========================================
+# Angular specific ignores
+# ===========================================
+
+# Compiled output
+/frontend/dist/
+/frontend/tmp/
+/frontend/out-tsc/
+/frontend/bazel-out
+
+# Node modules
+/frontend/node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDEs and editors
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+
+# Miscellaneous
+/.angular/cache
+.sass-cache/
+/frontend/connect.lock
+/frontend/coverage/
+/frontend/libpeerconnection.log
+testem.log
+/frontend/typings
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Angular specific
+/frontend/.angular/
+/frontend/e2e/*.js
+/frontend/e2e/*.map
+
+# ===========================================
+# Docker specific ignores
+# ===========================================
+
+# Docker build cache
+.docker/
+
+# ===========================================
+# Kubernetes specific ignores  
+# ===========================================
+
+# Helm charts
+/charts/*/charts/
+/charts/*/Chart.lock
+
+# ===========================================
+# Environment and Configuration
+# ===========================================
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Configuration files with secrets
+config/secrets.yaml
+*.key
+*.pem
+*.crt
+
+# ===========================================
+# Logs and Runtime
+# ===========================================
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ===========================================
+# Development and Testing
+# ===========================================
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Test results
+test-results/
+junit.xml
+
+# ===========================================
+# Build artifacts
+# ===========================================
+
+# Build directories
+build/
+dist/
+*.tar.gz
+*.zip
+
+# ===========================================
+# OS generated files
+# ===========================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===========================================
+# Temporary files
+# ===========================================
+
+# Temporary folders
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Editor backup files
+*~
+*.swp
+*.swo
+*#
+.#*
+
+# ===========================================
+# Package managers
+# ===========================================
+
+# NPM
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Go modules (if using vendor)
+# vendor/

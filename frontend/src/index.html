@@ -6,7 +6,7 @@
     <title>Luminosity Festival Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Free CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -32,6 +32,12 @@
         .add-btn.added:hover {
             transform: scale(1.05);
         }
+        .concert-item.selected {
+             background-color: #D1FAE5; /* emerald-100 */
+        }
+        .concert-item.selected:hover {
+             background-color: #A7F3D0; /* emerald-200 */
+        }
         .conflict-container {
             max-height: 0;
             overflow: hidden;
@@ -52,6 +58,8 @@
         .dark .text-gray-500 { color: #6B7280; }
         .dark .border-b { border-color: #374151; }
         .dark .concert-item:hover { background-color: #374151; }
+        .dark .concert-item.selected { background-color: #064E3B; }
+        .dark .concert-item.selected:hover { background-color: #047857; }
         .dark .day-header, .dark .itinerary-day-header { background-color: #1F2937; }
         .dark .priority-btn { background-color: #374151; border-color: #4B5563; color: #D1D5DB; }
         .dark .priority-btn.btn-selected { background-color: #6366F1; color: white; }
@@ -282,31 +290,40 @@
         ];
         
         // --- DATA PRE-PROCESSING ---
-        // Consolidate "Beachclub Bernies" stages and add the theme as a note
-        concertData = concertData.map(concert => {
-            if (concert.stage.includes('Beachclub Bernies')) {
-                const match = concert.stage.match(/\(([^)]+)\)/); // Find text in parentheses
+        // Add a unique ID to each concert and consolidate stages
+        concertData = concertData.map((concert, index) => {
+            let stage = concert.stage;
+            let notes = concert.notes || '';
+
+            if (stage.includes('Beachclub Bernies')) {
+                const match = stage.match(/\(([^)]+)\)/); // Find text in parentheses
                 if (match) {
                     const existingNotes = concert.notes ? `${concert.notes} ` : '';
-                    concert.notes = `${existingNotes}${match[1]}`;
+                    notes = `${existingNotes}${match[1]}`.trim();
                 }
-                concert.stage = 'Beachclub Bernies';
+                stage = 'Beachclub Bernies';
             }
-             else if (concert.stage.includes('Sunset')) { 
+             else if (stage.includes('Sunset')) { 
                 let themeNote = '';
-                if (concert.stage.includes('Classics')) {
+                if (stage.includes('Classics')) {
                     themeNote = 'Classics';
-                } else if (concert.stage.includes('Powers')) {
+                } else if (stage.includes('Powers')) {
                     themeNote = 'Powers';
                 }
                 
                 if (themeNote) {
                      const existingNotes = concert.notes ? `${concert.notes} ` : '';
-                     concert.notes = `${existingNotes}${themeNote}`;
+                     notes = `${existingNotes}${themeNote}`.trim();
                 }
-                concert.stage = 'Sunset Beach';
+                stage = 'Sunset Beach';
             }
-            return concert;
+            
+            return {
+                ...concert,
+                id: `concert-${index}`, // Assign a stable, unique ID
+                stage: stage,
+                notes: notes,
+            };
         });
 
 
@@ -400,9 +417,14 @@
 
                     concertsByDay[day].forEach((concert) => {
                         const concertEl = document.createElement('div');
-                        concertEl.className = 'concert-item flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50 rounded-lg';
+                        concertEl.className = 'concert-item flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50';
                         const existingSelection = userSelections.find(s => s.id === concert.id);
                         const isAdded = !!existingSelection;
+
+                        if (isAdded) {
+                            concertEl.classList.add('selected');
+                        }
+
                         const buttonContent = isAdded ? checkMarkSVG : 'Add';
                         const buttonClasses = isAdded ? 'add-btn added' : 'add-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-4 rounded-md';
                         
@@ -413,7 +435,7 @@
                                 <p class="text-sm text-indigo-500 font-medium">${concert.stage}</p>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <div class="priority-btn-group flex">
+                                <div class="priority-btn-group flex" data-id="${concert.id}">
                                     <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white" data-priority="1">P1</button><button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white" data-priority="2">P2</button><button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white" data-priority="3">P3</button>
                                 </div>
                                 <button class="${buttonClasses}" data-id="${concert.id}">${buttonContent}</button>
@@ -558,21 +580,39 @@
                 } else {
                     const concertElement = button.closest('.concert-item');
                     const selectedPriorityBtn = concertElement.querySelector('.priority-btn-group .btn-selected');
-                    if (!selectedPriorityBtn) {
-                        alert("Please select a priority (P1, P2, or P3) before adding the concert.");
-                        return;
-                    }
-                    let desiredPriority = parseInt(selectedPriorityBtn.dataset.priority, 10);
-                    
-                    let finalPriority = desiredPriority;
-                    const conflictingConcerts = userSelections.filter(c => checkConflict(concert, c));
-                    if (conflictingConcerts.length > 0) {
-                        const highestConflictPriority = Math.min(...conflictingConcerts.map(c => c.priority));
-                        if (finalPriority <= highestConflictPriority) {
-                            finalPriority = Math.min(3, highestConflictPriority + 1);
+                    let assignedPriority;
+
+                    if (selectedPriorityBtn) {
+                        assignedPriority = parseInt(selectedPriorityBtn.dataset.priority, 10);
+                    } else {
+                        // Smart auto-priority logic
+                        let foundSlot = false;
+                        for (let priority = 1; priority <= 3; priority++) {
+                            const tempConcert = { ...concert, priority: priority };
+                            const otherSelections = userSelections.filter(s => s.id !== concert.id);
+                            
+                            const tempWinners = [...otherSelections.filter(c => checkConflict(tempConcert, c) === false), tempConcert]
+                                                .sort((a,b) => a.priority - b.priority || timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+                            
+                            let isWinner = false;
+                            let currentWinners = [];
+                            tempWinners.forEach(c => {
+                                if(!currentWinners.some(w => checkConflict(c, w))) {
+                                    currentWinners.push(c);
+                                }
+                            });
+
+                            if(currentWinners.some(w => w.id === concert.id)) {
+                                assignedPriority = priority;
+                                foundSlot = true;
+                                break;
+                            }
+                        }
+                        if (!foundSlot) {
+                            assignedPriority = 3; // Default to P3 if all slots create major conflicts
                         }
                     }
-                    userSelections.push({ ...concert, priority: finalPriority });
+                    userSelections.push({ ...concert, priority: assignedPriority });
                 }
                 saveSelections();
                 applyFiltersAndRender();
@@ -580,10 +620,25 @@
             };
 
             const handlePriorityClick = (e) => {
-                if (e.target.classList.contains('priority-btn')) {
-                    const parentGroup = e.target.parentElement;
-                    parentGroup.querySelectorAll('.priority-btn').forEach(btn => btn.classList.remove('btn-selected'));
-                    e.target.classList.add('btn-selected');
+                const button = e.target.closest('.priority-btn');
+                if (!button) return;
+                
+                const priorityGroup = button.parentElement;
+                const concertId = priorityGroup.dataset.id;
+                const newPriority = parseInt(button.dataset.priority, 10);
+                
+                const selectionIndex = userSelections.findIndex(s => s.id === concertId);
+
+                if (selectionIndex > -1) {
+                    userSelections[selectionIndex].priority = newPriority;
+                    saveSelections();
+                    applyFiltersAndRender();
+                    updateItinerary();
+                } else {
+                    // This allows pre-selection before adding
+                    const allPriorityGroups = document.querySelectorAll(`[data-id="${concertId}"] .priority-btn`);
+                    allPriorityGroups.forEach(btn => btn.classList.remove('btn-selected'));
+                    button.classList.add('btn-selected');
                 }
             };
             
@@ -671,7 +726,8 @@
                 const artistSearchInput = document.getElementById('artist-search');
                 const resetBtn = document.getElementById('reset-filters-btn');
 
-                const uniqueDays = getUniqueValues('day');
+                const dayOrder = ['Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const uniqueDays = getUniqueValues('day').sort((a,b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
                 const uniqueStages = getUniqueValues('stage');
 
                 uniqueDays.forEach(day => {
@@ -709,8 +765,14 @@
 
             // --- Event Listeners ---
             themeToggleBtn.addEventListener('click', toggleTheme);
-            concertListContainer.addEventListener('click', handleAddClick);
-            concertListContainer.addEventListener('click', handlePriorityClick);
+            const concertListElement = document.getElementById('concert-list');
+            concertListElement.addEventListener('click', (e) => {
+                if (e.target.closest('.add-btn')) {
+                    handleAddClick(e);
+                } else if (e.target.closest('.priority-btn')) {
+                    handlePriorityClick(e);
+                }
+            });
             itineraryListContainer.addEventListener('click', handleItineraryClick);
             clearPlanBtn.addEventListener('click', clearPlan);
         });

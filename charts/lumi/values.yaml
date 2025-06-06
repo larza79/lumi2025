@@ -62,21 +62,17 @@ service:
 ingress:
   enabled: true
   className: "nginx"
-  annotations:
-    {
-      acme.cert-manager.io/http01-edit-in-place: "true",
-      nginx.ingress.kubernetes.io/ssl-redirect: "false",
-      cert-manager.io/cluster-issuer: "letsencrypt-prod",
-      kubernetes.io/tls-acme: "true",
-      cert-manager.io/issue-temporary-certificate: "true",
-    }
+  annotations: { cert-manager.io/cluster-issuer: "letsencrypt-prod" }
 
   hosts:
     - host: lumi.hemmelig.io
       paths:
         - path: /
           pathType: ImplementationSpecific
-  tls: [{ hosts: ["lumi.hemmelig.io"], secretName: "lumi-hemmelig-tls" }]
+  tls:
+    - secretName: lumi-tls
+      hosts:
+        - lumi.hemmelig.io
 
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious

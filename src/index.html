@@ -49,6 +49,7 @@
         .dark .card { background-color: #1F2937; border-color: #374151; }
         .dark .text-indigo-600 { color: #818CF8; }
         .dark .text-gray-600 { color: #9CA3AF; }
+        .dark .text-gray-500 { color: #6B7280; }
         .dark .border-b { border-color: #374151; }
         .dark .concert-item:hover { background-color: #374151; }
         .dark .day-header, .dark .itinerary-day-header { background-color: #1F2937; }
@@ -63,6 +64,9 @@
         .dark .text-yellow-700 { color: #fde68a; }
         .dark .border-yellow-500 { border-color: #f59e0b; }
         .dark .hover\:bg-yellow-200:hover { background-color: #78350f; }
+        .dark .bg-gray-50 { background-color: #374151; }
+        .dark input[type="text"], .dark input[type="checkbox"] { background-color: #1f2937; border-color: #4b5563; }
+        .dark input[type="checkbox"]:checked { background-color: #4f46e5; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -72,8 +76,8 @@
             <h1 class="text-4xl sm:text-5xl font-bold text-indigo-600">Luminosity Beach Festival 2025</h1>
             <p class="mt-2 text-lg text-gray-600">Your Personal Concert Planner</p>
             <button id="theme-toggle" class="absolute top-0 right-0 p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
-                <i id="theme-icon-light" class="fa-solid fa-sun"></i>
-                <i id="theme-icon-dark" class="fa-solid fa-moon hidden"></i>
+                <i id="theme-icon-light" class="fa-solid fa-sun fa-lg"></i>
+                <i id="theme-icon-dark" class="fa-solid fa-moon fa-lg hidden"></i>
             </button>
         </header>
 
@@ -81,6 +85,32 @@
             <!-- Concert Selection Column -->
             <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg card">
                 <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Select Your Concerts</h2>
+                
+                <!-- Filter Section -->
+                <div id="filter-container" class="mb-6 p-4 border rounded-lg bg-gray-50">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="artist-search" class="block text-sm font-medium mb-1">Search Artist</label>
+                            <input type="text" id="artist-search" placeholder="e.g. Ferry Corsten" class="w-full p-2 border rounded-md">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="reset-filters-btn" class="w-full md:w-auto bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-white">Reset Filters</button>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <h4 class="font-medium mb-2">Filter by Day</h4>
+                        <div id="day-filters" class="flex flex-wrap gap-x-4 gap-y-2">
+                            <!-- Day checkboxes will be injected here -->
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <h4 class="font-medium mb-2">Filter by Stage</h4>
+                        <div id="stage-filters" class="flex flex-wrap gap-x-4 gap-y-2">
+                            <!-- Stage checkboxes will be injected here -->
+                        </div>
+                    </div>
+                </div>
+
                 <div id="concert-list"></div>
             </div>
 
@@ -96,7 +126,7 @@
     </div>
 
     <script>
-        const concertData = [
+        let concertData = [
             // Thursday Data
             { day: 'Thursday', date: '26-Jun-2025', stage: 'Mainstage', startTime: '12:00', endTime: '13:00', artist: 'Spark & Shade' },
             { day: 'Thursday', date: '26-Jun-2025', stage: 'Mainstage', startTime: '13:00', endTime: '14:00', artist: 'Somna' },
@@ -250,6 +280,34 @@
             { day: 'Sunday', date: '29-Jun-2025', stage: 'This is Trance!', startTime: '20:30', endTime: '21:45', artist: 'Key4050' },
             { day: 'Sunday', date: '29-Jun-2025', stage: 'This is Trance!', startTime: '21:45', endTime: '23:00', artist: 'Nikolauss' },
         ];
+        
+        // --- DATA PRE-PROCESSING ---
+        // Consolidate "Beachclub Bernies" stages and add the theme as a note
+        concertData = concertData.map(concert => {
+            if (concert.stage.includes('Beachclub Bernies')) {
+                const match = concert.stage.match(/\(([^)]+)\)/); // Find text in parentheses
+                if (match) {
+                    const existingNotes = concert.notes ? `${concert.notes} ` : '';
+                    concert.notes = `${existingNotes}${match[1]}`;
+                }
+                concert.stage = 'Beachclub Bernies';
+            }
+             else if (concert.stage.includes('Sunset')) { 
+                let themeNote = '';
+                if (concert.stage.includes('Classics')) {
+                    themeNote = 'Classics';
+                } else if (concert.stage.includes('Powers')) {
+                    themeNote = 'Powers';
+                }
+                
+                if (themeNote) {
+                     const existingNotes = concert.notes ? `${concert.notes} ` : '';
+                     concert.notes = `${existingNotes}${themeNote}`;
+                }
+                concert.stage = 'Sunset Beach';
+            }
+            return concert;
+        });
 
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -263,6 +321,7 @@
             const htmlEl = document.documentElement;
 
             let userSelections = [];
+            let expandedConflictId = null;
 
             // --- Theme Management ---
             const applyTheme = (theme) => {
@@ -290,6 +349,7 @@
             };
             const getDuration = (start, end) => timeToMinutes(end) - timeToMinutes(start);
             const checkConflict = (concertA, concertB) => {
+                if (!concertA || !concertB) return false;
                 const startA = timeToMinutes(concertA.startTime);
                 const endA = timeToMinutes(concertA.endTime);
                 const startB = timeToMinutes(concertB.startTime);
@@ -298,25 +358,47 @@
                 return overlap > 15;
             };
 
-            // --- Data Processing ---
-            const concertsByDay = concertData.reduce((acc, concert) => {
-                (acc[concert.day] = acc[concert.day] || []).push(concert);
-                return acc;
-            }, {});
+            // --- Data Processing & Filtering ---
+            const getUniqueValues = (key) => [...new Set(concertData.map(item => item[key]))].sort();
+
+            const applyFiltersAndRender = () => {
+                const artistSearch = document.getElementById('artist-search').value.toLowerCase();
+                const selectedDays = [...document.querySelectorAll('#day-filters input:checked')].map(el => el.value);
+                const selectedStages = [...document.querySelectorAll('#stage-filters input:checked')].map(el => el.value);
+
+                const filteredConcerts = concertData.filter(concert => {
+                    const artistMatch = concert.artist.toLowerCase().includes(artistSearch);
+                    const dayMatch = selectedDays.length === 0 || selectedDays.includes(concert.day);
+                    const stageMatch = selectedStages.length === 0 || selectedStages.includes(concert.stage);
+                    return artistMatch && dayMatch && stageMatch;
+                });
+                
+                renderFilteredConcerts(filteredConcerts);
+            };
 
             // --- Render Functions ---
-            const renderConcertList = () => {
+            const renderFilteredConcerts = (concertsToRender) => {
                 concertListContainer.innerHTML = '';
+                if(concertsToRender.length === 0) {
+                    concertListContainer.innerHTML = `<p class="text-center text-gray-500 mt-8">No concerts match your filters.</p>`;
+                    return;
+                }
+
                 const checkMarkSVG = `<i class="fa-solid fa-check"></i>`;
-                Object.keys(concertsByDay).forEach(day => {
+
+                const concertsByDay = concertsToRender.reduce((acc, concert) => {
+                    (acc[concert.day] = acc[concert.day] || []).push(concert);
+                    return acc;
+                }, {});
+
+
+                Object.keys(concertsByDay).sort((a,b) => ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a) - ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b)).forEach(day => {
                     const dayHeader = document.createElement('h3');
                     dayHeader.className = 'day-header text-xl font-bold mt-6 mb-3 bg-gray-200 p-2 rounded-md';
                     dayHeader.textContent = `${day}, ${concertsByDay[day][0].date}`;
                     concertListContainer.appendChild(dayHeader);
 
-                    concertsByDay[day].forEach((concert, index) => {
-                        const concertId = `${day.replace(/\s+/g, '-')}-${index}`;
-                        concert.id = concertId;
+                    concertsByDay[day].forEach((concert) => {
                         const concertEl = document.createElement('div');
                         concertEl.className = 'concert-item flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50 rounded-lg';
                         const existingSelection = userSelections.find(s => s.id === concert.id);
@@ -334,7 +416,7 @@
                                 <div class="priority-btn-group flex">
                                     <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white" data-priority="1">P1</button><button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white" data-priority="2">P2</button><button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white" data-priority="3">P3</button>
                                 </div>
-                                <button class="${buttonClasses}" data-id="${concertId}">${buttonContent}</button>
+                                <button class="${buttonClasses}" data-id="${concert.id}">${buttonContent}</button>
                             </div>`;
                         concertListContainer.appendChild(concertEl);
                         if (isAdded) {
@@ -345,7 +427,7 @@
                 });
             };
             
-            const updateItinerary = (idToExpand = null) => {
+            const updateItinerary = () => {
                 if (userSelections.length === 0) {
                     itineraryListContainer.innerHTML = '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
                     clearPlanBtn.classList.add('hidden');
@@ -354,7 +436,6 @@
                 
                 clearPlanBtn.classList.remove('hidden');
                 
-                // 1. Determine the winning concerts
                 const sortedSelections = [...userSelections].sort((a, b) => {
                     if (a.priority !== b.priority) return a.priority - b.priority;
                     return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
@@ -367,22 +448,19 @@
                     }
                 });
                 
-                // 2. Structure the itinerary with winners and their conflicts
                 const itineraryByDay = {};
                 winners.sort((a,b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
                        .forEach(winner => {
                     const day = winner.day;
                     if (!itineraryByDay[day]) itineraryByDay[day] = [];
-
                     const conflicts = userSelections.filter(c => c.id !== winner.id && checkConflict(c, winner));
-                    
                     itineraryByDay[day].push({ concert: winner, conflicts: conflicts });
                 });
 
-                renderItineraryUI(itineraryByDay, idToExpand);
+                renderItineraryUI(itineraryByDay);
             };
 
-            const renderItineraryUI = (itineraryByDay, idToExpand = null) => {
+            const renderItineraryUI = (itineraryByDay) => {
                 itineraryListContainer.innerHTML = '';
                 const conflictIconSVG = `<i class="fa-solid fa-triangle-exclamation text-red-500"></i>`;
                 const removeIconSVG = `<i class="fa-solid fa-xmark"></i>`;
@@ -393,7 +471,7 @@
                     return;
                 }
 
-                Object.keys(itineraryByDay).sort().forEach(day => {
+                Object.keys(itineraryByDay).sort((a,b) => ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a) - ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b)).forEach(day => {
                     const dayHeader = document.createElement('h3');
                     dayHeader.className = 'itinerary-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 p-2 rounded-md';
                     dayHeader.textContent = day;
@@ -434,7 +512,7 @@
                         `;
                         itineraryListContainer.appendChild(itemEl);
                         
-                        if (idToExpand && concert.id === idToExpand && conflicts.length > 0) {
+                        if (expandedConflictId && concert.id === expandedConflictId && conflicts.length > 0) {
                             const conflictContainer = itemEl.querySelector(`#conflict-list-${concert.id}`);
                             conflictContainer.classList.add('expanded');
                             populateConflictList(conflictContainer, conflicts, concert.id);
@@ -497,7 +575,7 @@
                     userSelections.push({ ...concert, priority: finalPriority });
                 }
                 saveSelections();
-                renderConcertList();
+                applyFiltersAndRender();
                 updateItinerary();
             };
 
@@ -512,9 +590,14 @@
             const handleConflictIconClick = (icon) => {
                 const concertId = icon.dataset.id;
                 const conflictContainer = document.getElementById(`conflict-list-${concertId}`);
-                const isExpanded = conflictContainer.classList.toggle('expanded');
                 
-                if (isExpanded) {
+                if (conflictContainer.classList.contains('expanded')) {
+                    conflictContainer.classList.remove('expanded');
+                    expandedConflictId = null;
+                } else {
+                    document.querySelectorAll('.conflict-container.expanded').forEach(c => c.classList.remove('expanded'));
+                    conflictContainer.classList.add('expanded');
+                    expandedConflictId = concertId;
                     const mainConcertItem = userSelections.find(c => c.id === concertId);
                     const conflicts = userSelections.filter(c => c.id !== concertId && checkConflict(c, mainConcertItem));
                     populateConflictList(conflictContainer, conflicts, concertId);
@@ -526,7 +609,7 @@
                 if (indexToRemove > -1) {
                     userSelections.splice(indexToRemove, 1);
                     saveSelections();
-                    renderConcertList();
+                    applyFiltersAndRender();
                     updateItinerary();
                 }
             };
@@ -534,12 +617,14 @@
             const handleItineraryClick = (e) => {
                 const removeItemBtn = e.target.closest('.remove-item-btn');
                 if (removeItemBtn) {
+                    expandedConflictId = null; 
                     handleRemoveItem(removeItemBtn.dataset.id);
                     return;
                 }
 
                 const removeConflictBtn = e.target.closest('.remove-conflict-btn');
                  if (removeConflictBtn) {
+                    expandedConflictId = null; 
                     handleRemoveItem(removeConflictBtn.dataset.id);
                     return;
                 }
@@ -555,10 +640,12 @@
                         const mainPriority = userSelections[mainConcertIndex].priority;
                         userSelections[mainConcertIndex].priority = userSelections[conflictConcertIndex].priority;
                         userSelections[conflictConcertIndex].priority = mainPriority;
+                        
+                        expandedConflictId = conflictId; 
 
                         saveSelections();
-                        renderConcertList();
-                        updateItinerary(conflictId);
+                        applyFiltersAndRender();
+                        updateItinerary();
                     }
                     return;
                 }
@@ -572,16 +659,52 @@
             
             const clearPlan = () => {
                 userSelections = [];
+                expandedConflictId = null;
                 saveSelections();
-                renderConcertList();
+                applyFiltersAndRender();
                 updateItinerary();
+            };
+
+            const initializeFilters = () => {
+                const dayFilterContainer = document.getElementById('day-filters');
+                const stageFilterContainer = document.getElementById('stage-filters');
+                const artistSearchInput = document.getElementById('artist-search');
+                const resetBtn = document.getElementById('reset-filters-btn');
+
+                const uniqueDays = getUniqueValues('day');
+                const uniqueStages = getUniqueValues('stage');
+
+                uniqueDays.forEach(day => {
+                    const checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'flex items-center';
+                    checkboxDiv.innerHTML = `<input id="day-${day}" value="${day}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="day-${day}" class="ml-2">${day}</label>`;
+                    dayFilterContainer.appendChild(checkboxDiv);
+                });
+
+                uniqueStages.forEach(stage => {
+                    const checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'flex items-center';
+                    checkboxDiv.innerHTML = `<input id="stage-${stage}" value="${stage}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="stage-${stage}" class="ml-2">${stage}</label>`;
+                    stageFilterContainer.appendChild(checkboxDiv);
+                });
+                
+                artistSearchInput.addEventListener('input', applyFiltersAndRender);
+                dayFilterContainer.addEventListener('change', applyFiltersAndRender);
+                stageFilterContainer.addEventListener('change', applyFiltersAndRender);
+
+                resetBtn.addEventListener('click', () => {
+                    artistSearchInput.value = '';
+                    document.querySelectorAll('#filter-container input[type="checkbox"]').forEach(cb => cb.checked = false);
+                    applyFiltersAndRender();
+                });
             };
 
             // --- Initialisation ---
             const initialTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
             applyTheme(initialTheme);
             loadSelections();
-            renderConcertList();
+            initializeFilters();
+            applyFiltersAndRender();
             updateItinerary();
 
             // --- Event Listeners ---

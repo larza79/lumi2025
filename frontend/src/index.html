@@ -1445,7 +1445,6 @@
         const htmlEl = document.documentElement;
 
         let userSelections = [];
-        let expandedConflictId = null;
 
         // --- Theme Management ---
         const applyTheme = (theme) => {
@@ -1772,43 +1771,36 @@
                 selectedPriorityBtn.dataset.priority,
                 10
               );
+              const concertToChange = {
+                ...concert,
+                priority: assignedPriority,
+              };
+              userSelections.forEach((selection) => {
+                if (
+                  checkConflict(selection, concertToChange) &&
+                  selection.priority >= assignedPriority
+                ) {
+                  selection.priority = Math.min(3, selection.priority + 1);
+                }
+              });
             } else {
               // Smart auto-priority logic
-              let foundSlot = false;
-              for (let priority = 1; priority <= 3; priority++) {
-                const tempConcert = { ...concert, priority: priority };
-                const otherSelections = userSelections.filter(
-                  (s) => s.id !== concert.id
-                );
-
-                const tempWinners = [
-                  ...otherSelections.filter(
-                    (c) => checkConflict(tempConcert, c) === false
-                  ),
-                  tempConcert,
-                ].sort(
-                  (a, b) =>
-                    a.priority - b.priority ||
-                    timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
-                );
-
-                let isWinner = false;
-                let currentWinners = [];
-                tempWinners.forEach((c) => {
-                  if (!currentWinners.some((w) => checkConflict(c, w))) {
-                    currentWinners.push(c);
-                  }
-                });
-
-                if (currentWinners.some((w) => w.id === concert.id)) {
-                  assignedPriority = priority;
-                  foundSlot = true;
-                  break;
+              let finalPriority = 1;
+              if (
+                userSelections.some(
+                  (s) => checkConflict(s, concert) && s.priority === 1
+                )
+              ) {
+                finalPriority = 2;
+                if (
+                  userSelections.some(
+                    (s) => checkConflict(s, concert) && s.priority === 2
+                  )
+                ) {
+                  finalPriority = 3;
                 }
               }
-              if (!foundSlot) {
-                assignedPriority = 3; // Default to P3 if all slots create major conflicts
-              }
+              assignedPriority = finalPriority;
             }
             userSelections.push({ ...concert, priority: assignedPriority });
           }
@@ -1830,16 +1822,26 @@
           );
 
           if (selectionIndex > -1) {
+            const concertToChange = userSelections[selectionIndex];
+            // Demote conflicting concerts
+            userSelections.forEach((selection) => {
+              if (
+                selection.id !== concertId &&
+                checkConflict(selection, concertToChange) &&
+                selection.priority >= newPriority
+              ) {
+                selection.priority = Math.min(3, newPriority + 1);
+              }
+            });
             userSelections[selectionIndex].priority = newPriority;
             saveSelections();
             applyFiltersAndRender();
             updateItinerary();
           } else {
             // This allows pre-selection before adding
-            const allPriorityGroups = document.querySelectorAll(
-              `[data-id="${concertId}"] .priority-btn`
-            );
-            allPriorityGroups.forEach((btn) =>
+            const allPriorityButtons =
+              priorityGroup.querySelectorAll(".priority-btn");
+            allPriorityButtons.forEach((btn) =>
               btn.classList.remove("btn-selected")
             );
             button.classList.add("btn-selected");

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Luminosity Festival Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Free CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -30,51 +32,37 @@
         .add-btn.added:hover {
             transform: scale(1.05);
         }
+        .conflict-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        .conflict-container.expanded {
+            max-height: 500px; /* Adjust as needed */
+        }
+        .conflict-icon {
+            cursor: pointer;
+        }
 
         /* --- Dark Mode Styles --- */
-        .dark body {
-            background-color: #111827; /* gray-900 */
-            color: #D1D5DB; /* gray-300 */
-        }
-        .dark .card {
-            background-color: #1F2937; /* gray-800 */
-            border-color: #374151; /* gray-700 */
-        }
-        .dark .text-indigo-600 {
-            color: #818CF8; /* indigo-400 */
-        }
-        .dark .text-gray-600 {
-            color: #9CA3AF; /* gray-400 */
-        }
-        .dark .border-b {
-            border-color: #374151; /* gray-700 */
-        }
-        .dark .concert-item:hover {
-            background-color: #374151; /* gray-700 */
-        }
-        .dark .day-header {
-             background-color: #1F2937; /* gray-800 */
-        }
-        .dark .priority-btn {
-            background-color: #374151; /* gray-700 */
-            border-color: #4B5563; /* gray-600 */
-            color: #D1D5DB; /* gray-300 */
-        }
-        .dark .priority-btn.btn-selected {
-            background-color: #6366F1; /* indigo-500 */
-            color: white;
-        }
+        .dark body { background-color: #111827; color: #D1D5DB; }
+        .dark .card { background-color: #1F2937; border-color: #374151; }
+        .dark .text-indigo-600 { color: #818CF8; }
+        .dark .text-gray-600 { color: #9CA3AF; }
+        .dark .border-b { border-color: #374151; }
+        .dark .concert-item:hover { background-color: #374151; }
+        .dark .day-header, .dark .itinerary-day-header { background-color: #1F2937; }
+        .dark .priority-btn { background-color: #374151; border-color: #4B5563; color: #D1D5DB; }
+        .dark .priority-btn.btn-selected { background-color: #6366F1; color: white; }
         .dark .bg-green-100 { background-color: #042f2e; }
         .dark .text-green-800 { color: #6ee7b7; }
         .dark .text-green-700 { color: #a7f3d0; }
         .dark .border-green-500 { border-color: #10b981; }
-
-        .dark .bg-red-100 { background-color: #450a0a; }
-        .dark .text-red-800 { color: #fca5a5; }
-        .dark .text-red-700 { color: #fecaca; }
-        .dark .text-red-600 { color: #f87171; }
-        .dark .border-red-500 { border-color: #ef4444; }
-
+        .dark .bg-yellow-100 { background-color: #422006; }
+        .dark .text-yellow-800 { color: #fcd34d; }
+        .dark .text-yellow-700 { color: #fde68a; }
+        .dark .border-yellow-500 { border-color: #f59e0b; }
+        .dark .hover\:bg-yellow-200:hover { background-color: #78350f; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -84,8 +72,8 @@
             <h1 class="text-4xl sm:text-5xl font-bold text-indigo-600">Luminosity Beach Festival 2025</h1>
             <p class="mt-2 text-lg text-gray-600">Your Personal Concert Planner</p>
             <button id="theme-toggle" class="absolute top-0 right-0 p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
-                <svg id="theme-icon-light" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                <svg id="theme-icon-dark" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                <i id="theme-icon-light" class="fa-solid fa-sun"></i>
+                <i id="theme-icon-dark" class="fa-solid fa-moon hidden"></i>
             </button>
         </header>
 
@@ -93,21 +81,15 @@
             <!-- Concert Selection Column -->
             <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg card">
                 <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Select Your Concerts</h2>
-                <div id="concert-list">
-                    <!-- Concerts will be dynamically inserted here -->
-                </div>
+                <div id="concert-list"></div>
             </div>
 
             <!-- Itinerary Column -->
             <div class="lg:col-span-1">
                 <div class="sticky top-8 bg-white p-6 rounded-2xl shadow-lg card">
                     <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Your Itinerary</h2>
-                    <div id="itinerary-list" class="space-y-4">
-                        <p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>
-                    </div>
-                     <button id="clear-plan-btn" class="mt-6 w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow transition-transform transform hover:scale-105 hidden">
-                        Clear Plan
-                    </button>
+                    <div id="itinerary-list" class="space-y-4"></div>
+                     <button id="clear-plan-btn" class="mt-6 w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow transition-transform transform hover:scale-105 hidden">Clear Plan</button>
                 </div>
             </div>
         </div>
@@ -284,17 +266,10 @@
 
             // --- Theme Management ---
             const applyTheme = (theme) => {
-                if (theme === 'dark') {
-                    htmlEl.classList.add('dark');
-                    darkIcon.classList.remove('hidden');
-                    lightIcon.classList.add('hidden');
-                } else {
-                    htmlEl.classList.remove('dark');
-                    lightIcon.classList.remove('hidden');
-                    darkIcon.classList.add('hidden');
-                }
+                htmlEl.classList.toggle('dark', theme === 'dark');
+                darkIcon.classList.toggle('hidden', theme !== 'dark');
+                lightIcon.classList.toggle('hidden', theme === 'dark');
             };
-            
             const toggleTheme = () => {
                 const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
                 localStorage.setItem('theme', newTheme);
@@ -302,15 +277,10 @@
             };
 
             // --- LocalStorage ---
-            const saveSelections = () => {
-                localStorage.setItem('festivalPlannerSelections', JSON.stringify(userSelections));
-            };
-
+            const saveSelections = () => localStorage.setItem('festivalPlannerSelections', JSON.stringify(userSelections));
             const loadSelections = () => {
                 const savedData = localStorage.getItem('festivalPlannerSelections');
-                if (savedData) {
-                    userSelections = JSON.parse(savedData);
-                }
+                if (savedData) userSelections = JSON.parse(savedData);
             };
 
             // --- Helpers ---
@@ -319,6 +289,14 @@
                 return hours * 60 + minutes;
             };
             const getDuration = (start, end) => timeToMinutes(end) - timeToMinutes(start);
+            const checkConflict = (concertA, concertB) => {
+                const startA = timeToMinutes(concertA.startTime);
+                const endA = timeToMinutes(concertA.endTime);
+                const startB = timeToMinutes(concertB.startTime);
+                const endB = timeToMinutes(concertB.endTime);
+                const overlap = Math.max(0, Math.min(endA, endB) - Math.max(startA, startB));
+                return overlap > 15;
+            };
 
             // --- Data Processing ---
             const concertsByDay = concertData.reduce((acc, concert) => {
@@ -329,8 +307,7 @@
             // --- Render Functions ---
             const renderConcertList = () => {
                 concertListContainer.innerHTML = '';
-                const checkMarkSVG = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
-
+                const checkMarkSVG = `<i class="fa-solid fa-check"></i>`;
                 Object.keys(concertsByDay).forEach(day => {
                     const dayHeader = document.createElement('h3');
                     dayHeader.className = 'day-header text-xl font-bold mt-6 mb-3 bg-gray-200 p-2 rounded-md';
@@ -340,19 +317,13 @@
                     concertsByDay[day].forEach((concert, index) => {
                         const concertId = `${day.replace(/\s+/g, '-')}-${index}`;
                         concert.id = concertId;
-                        
                         const concertEl = document.createElement('div');
                         concertEl.className = 'concert-item flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50 rounded-lg';
-                        concertEl.dataset.id = concertId;
-
                         const existingSelection = userSelections.find(s => s.id === concert.id);
                         const isAdded = !!existingSelection;
-
-                        let buttonContent = isAdded ? checkMarkSVG : 'Add';
-                        let buttonClasses = isAdded 
-                            ? 'add-btn added' 
-                            : 'add-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-4 rounded-md transition-transform transform hover:scale-105';
-
+                        const buttonContent = isAdded ? checkMarkSVG : 'Add';
+                        const buttonClasses = isAdded ? 'add-btn added' : 'add-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-4 rounded-md';
+                        
                         concertEl.innerHTML = `
                             <div class="flex-grow mb-2 sm:mb-0">
                                 <p class="font-semibold text-lg">${concert.artist} ${concert.notes ? `<span class="text-sm text-gray-500 font-normal">${concert.notes}</span>` : ''}</p>
@@ -360,16 +331,12 @@
                                 <p class="text-sm text-indigo-500 font-medium">${concert.stage}</p>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <div class="priority-btn-group" data-concert-id="${concertId}">
-                                    <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white" data-priority="1">P1</button>
-                                    <button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white" data-priority="2">P2</button>
-                                    <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white" data-priority="3">P3</button>
+                                <div class="priority-btn-group flex">
+                                    <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white" data-priority="1">P1</button><button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white" data-priority="2">P2</button><button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white" data-priority="3">P3</button>
                                 </div>
-                                <button class="${buttonClasses}" data-concert-id="${concertId}">${buttonContent}</button>
-                            </div>
-                        `;
+                                <button class="${buttonClasses}" data-id="${concertId}">${buttonContent}</button>
+                            </div>`;
                         concertListContainer.appendChild(concertEl);
-                        
                         if (isAdded) {
                            const priorityButton = concertEl.querySelector(`.priority-btn[data-priority="${existingSelection.priority}"]`);
                            if (priorityButton) priorityButton.classList.add('btn-selected');
@@ -378,7 +345,7 @@
                 });
             };
             
-            const updateItinerary = () => {
+            const updateItinerary = (idToExpand = null) => {
                 if (userSelections.length === 0) {
                     itineraryListContainer.innerHTML = '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
                     clearPlanBtn.classList.add('hidden');
@@ -387,70 +354,116 @@
                 
                 clearPlanBtn.classList.remove('hidden');
                 
+                // 1. Determine the winning concerts
                 const sortedSelections = [...userSelections].sort((a, b) => {
                     if (a.priority !== b.priority) return a.priority - b.priority;
                     return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
                 });
 
-                const finalPlan = [], rejectedPlan = [];
-
-                sortedSelections.forEach(currentConcert => {
-                    let hasConflict = false;
-                    const currentStart = timeToMinutes(currentConcert.startTime);
-                    const currentEnd = timeToMinutes(currentConcert.endTime);
-                    for (const plannedConcert of finalPlan) {
-                        const plannedStart = timeToMinutes(plannedConcert.startTime);
-                        const plannedEnd = timeToMinutes(plannedConcert.endTime);
-                        const overlap = Math.max(0, Math.min(currentEnd, plannedEnd) - Math.max(currentStart, plannedStart));
-                        if (overlap > 15) {
-                            hasConflict = true;
-                            break;
-                        }
+                const winners = [];
+                sortedSelections.forEach(concert => {
+                    if (!winners.some(winner => checkConflict(concert, winner))) {
+                        winners.push(concert);
                     }
-                    if (!hasConflict) finalPlan.push(currentConcert);
-                    else rejectedPlan.push({concert: currentConcert, reason: 'Conflict'});
                 });
                 
-                renderItineraryUI(finalPlan, rejectedPlan);
-            };
+                // 2. Structure the itinerary with winners and their conflicts
+                const itineraryByDay = {};
+                winners.sort((a,b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+                       .forEach(winner => {
+                    const day = winner.day;
+                    if (!itineraryByDay[day]) itineraryByDay[day] = [];
 
-            const renderItineraryUI = (plan, rejected) => {
-                itineraryListContainer.innerHTML = '';
-                plan.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-
-                if(plan.length === 0 && rejected.length > 0) {
-                    itineraryListContainer.innerHTML = '<p class="text-gray-500 font-semibold">All your selections have conflicts.</p>';
-                } else if (plan.length === 0) {
-                     itineraryListContainer.innerHTML = '<p class="text-gray-500">Add concerts to see your plan.</p>';
-                }
-
-                plan.forEach(concert => {
-                    const item = document.createElement('div');
-                    item.className = 'p-3 bg-green-100 border-l-4 border-green-500 rounded-r-lg';
-                    item.innerHTML = `
-                        <p class="font-bold text-green-800">${concert.artist} (P${concert.priority})</p>
-                        <p class="text-sm text-green-700">${concert.day} | ${concert.startTime} - ${concert.endTime} (${getDuration(concert.startTime, concert.endTime)} mins)</p>
-                        <p class="text-sm text-green-700 font-medium">@ ${concert.stage}</p>
-                    `;
-                    itineraryListContainer.appendChild(item);
+                    const conflicts = userSelections.filter(c => c.id !== winner.id && checkConflict(c, winner));
+                    
+                    itineraryByDay[day].push({ concert: winner, conflicts: conflicts });
                 });
 
-                if (rejected.length > 0) {
-                    const rejectedHeader = document.createElement('h4');
-                    rejectedHeader.className = 'text-lg font-semibold mt-6 mb-2 text-red-600';
-                    rejectedHeader.textContent = 'Skipped due to conflicts';
-                    itineraryListContainer.appendChild(rejectedHeader);
-                    rejected.forEach(item => {
-                         const rejectedItem = document.createElement('div');
-                         rejectedItem.className = 'p-3 bg-red-100 border-l-4 border-red-500 rounded-r-lg opacity-70';
-                         rejectedItem.innerHTML = `
-                            <p class="font-bold text-red-800">${item.concert.artist} (P${item.concert.priority})</p>
-                            <p class="text-sm text-red-700">${item.concert.day} | ${item.concert.startTime} - ${item.concert.endTime} (${getDuration(item.concert.startTime, item.concert.endTime)} mins)</p>
-                            <p class="text-sm text-red-700 font-medium">@ ${item.concert.stage}</p>
-                         `;
-                         itineraryListContainer.appendChild(rejectedItem);
-                    });
+                renderItineraryUI(itineraryByDay, idToExpand);
+            };
+
+            const renderItineraryUI = (itineraryByDay, idToExpand = null) => {
+                itineraryListContainer.innerHTML = '';
+                const conflictIconSVG = `<i class="fa-solid fa-triangle-exclamation text-red-500"></i>`;
+                const removeIconSVG = `<i class="fa-solid fa-xmark"></i>`;
+
+
+                if (Object.keys(itineraryByDay).length === 0) {
+                    itineraryListContainer.innerHTML = '<p class="text-gray-500 font-semibold">All your selections might have conflicts. Try changing priorities.</p>';
+                    return;
                 }
+
+                Object.keys(itineraryByDay).sort().forEach(day => {
+                    const dayHeader = document.createElement('h3');
+                    dayHeader.className = 'itinerary-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 p-2 rounded-md';
+                    dayHeader.textContent = day;
+                    itineraryListContainer.appendChild(dayHeader);
+
+                    itineraryByDay[day].forEach(item => {
+                        const { concert, conflicts } = item;
+                        const itemEl = document.createElement('div');
+                        itemEl.className = "itinerary-item";
+
+                        let conflictIconHtml = '';
+                        if (conflicts.length > 0) {
+                            const conflictTitles = conflicts.map(c => c.artist).join(', ');
+                            conflictIconHtml = `
+                                <div class="conflict-icon p-1" data-id="${concert.id}" title="Conflicts with: ${conflictTitles}">
+                                    ${conflictIconSVG}
+                                </div>
+                            `;
+                        }
+
+                        itemEl.innerHTML = `
+                            <div class="p-3 bg-green-100 border-l-4 border-green-500 rounded-r-lg">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="font-bold text-green-800">${concert.artist} (P${concert.priority})</p>
+                                        <p class="text-sm text-green-700">${concert.startTime} - ${concert.endTime} (${getDuration(concert.startTime, concert.endTime)} mins)</p>
+                                        <p class="text-sm text-green-700 font-medium">@ ${concert.stage}</p>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        ${conflictIconHtml}
+                                        <button title="Remove concert" class="remove-item-btn p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-100 dark:text-gray-500 dark:hover:text-red-400 dark:hover:bg-gray-700" data-id="${concert.id}">
+                                            ${removeIconSVG}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="conflict-container pl-5" id="conflict-list-${concert.id}"></div>
+                        `;
+                        itineraryListContainer.appendChild(itemEl);
+                        
+                        if (idToExpand && concert.id === idToExpand && conflicts.length > 0) {
+                            const conflictContainer = itemEl.querySelector(`#conflict-list-${concert.id}`);
+                            conflictContainer.classList.add('expanded');
+                            populateConflictList(conflictContainer, conflicts, concert.id);
+                        }
+                    });
+                });
+            };
+
+             const populateConflictList = (container, conflicts, mainConcertId) => {
+                const removeIconSVG = `<i class="fa-solid fa-xmark"></i>`;
+                container.innerHTML = '';
+                conflicts.forEach(conflict => {
+                    const conflictEl = document.createElement('div');
+                    conflictEl.className = 'p-3 mt-2 bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg';
+                    
+                    conflictEl.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="conflict-swap-item cursor-pointer flex-grow" data-main-id="${mainConcertId}" data-conflict-id="${conflict.id}">
+                                <p class="font-bold text-yellow-800">${conflict.artist} (P${conflict.priority})</p>
+                                <p class="text-sm text-yellow-700">${conflict.startTime} - ${conflict.endTime} @ ${conflict.stage}</p>
+                                <p class="text-sm text-yellow-700">Click to swap</p>
+                            </div>
+                            <button title="Remove conflict" class="remove-conflict-btn p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-100 dark:text-gray-500 dark:hover:text-red-400 dark:hover:bg-gray-700" data-id="${conflict.id}">
+                                ${removeIconSVG}
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(conflictEl);
+                });
             };
             
             // --- Event Handlers ---
@@ -458,39 +471,105 @@
                 const button = e.target.closest('.add-btn');
                 if (!button) return;
 
-                const concertId = button.dataset.concertId;
+                const concertId = button.dataset.id;
                 const concert = concertData.find(c => c.id === concertId);
-                const concertElement = button.closest('.concert-item');
-                const selectedPriorityBtn = concertElement.querySelector('.priority-btn-group .btn-selected');
-                
                 const existingSelectionIndex = userSelections.findIndex(s => s.id === concertId);
-                const checkMarkSVG = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
-
+                
                 if (existingSelectionIndex > -1) {
                     userSelections.splice(existingSelectionIndex, 1);
-                    button.innerHTML = 'Add';
-                    button.className = 'add-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-4 rounded-md transition-transform transform hover:scale-105';
                 } else {
+                    const concertElement = button.closest('.concert-item');
+                    const selectedPriorityBtn = concertElement.querySelector('.priority-btn-group .btn-selected');
                     if (!selectedPriorityBtn) {
                         alert("Please select a priority (P1, P2, or P3) before adding the concert.");
                         return;
                     }
-                    const priority = parseInt(selectedPriorityBtn.dataset.priority, 10);
-                    userSelections.push({ ...concert, priority });
-                    button.innerHTML = checkMarkSVG;
-                    button.className = 'add-btn added';
+                    let desiredPriority = parseInt(selectedPriorityBtn.dataset.priority, 10);
+                    
+                    let finalPriority = desiredPriority;
+                    const conflictingConcerts = userSelections.filter(c => checkConflict(concert, c));
+                    if (conflictingConcerts.length > 0) {
+                        const highestConflictPriority = Math.min(...conflictingConcerts.map(c => c.priority));
+                        if (finalPriority <= highestConflictPriority) {
+                            finalPriority = Math.min(3, highestConflictPriority + 1);
+                        }
+                    }
+                    userSelections.push({ ...concert, priority: finalPriority });
                 }
-                updateItinerary();
                 saveSelections();
+                renderConcertList();
+                updateItinerary();
             };
 
             const handlePriorityClick = (e) => {
-                if (!e.target.classList.contains('priority-btn')) return;
-                const parentGroup = e.target.parentElement;
-                parentGroup.querySelectorAll('.priority-btn').forEach(btn => btn.classList.remove('btn-selected'));
-                e.target.classList.add('btn-selected');
+                if (e.target.classList.contains('priority-btn')) {
+                    const parentGroup = e.target.parentElement;
+                    parentGroup.querySelectorAll('.priority-btn').forEach(btn => btn.classList.remove('btn-selected'));
+                    e.target.classList.add('btn-selected');
+                }
+            };
+            
+            const handleConflictIconClick = (icon) => {
+                const concertId = icon.dataset.id;
+                const conflictContainer = document.getElementById(`conflict-list-${concertId}`);
+                const isExpanded = conflictContainer.classList.toggle('expanded');
+                
+                if (isExpanded) {
+                    const mainConcertItem = userSelections.find(c => c.id === concertId);
+                    const conflicts = userSelections.filter(c => c.id !== concertId && checkConflict(c, mainConcertItem));
+                    populateConflictList(conflictContainer, conflicts, concertId);
+                }
+            };
+            
+            const handleRemoveItem = (concertIdToRemove) => {
+                const indexToRemove = userSelections.findIndex(c => c.id === concertIdToRemove);
+                if (indexToRemove > -1) {
+                    userSelections.splice(indexToRemove, 1);
+                    saveSelections();
+                    renderConcertList();
+                    updateItinerary();
+                }
             };
 
+            const handleItineraryClick = (e) => {
+                const removeItemBtn = e.target.closest('.remove-item-btn');
+                if (removeItemBtn) {
+                    handleRemoveItem(removeItemBtn.dataset.id);
+                    return;
+                }
+
+                const removeConflictBtn = e.target.closest('.remove-conflict-btn');
+                 if (removeConflictBtn) {
+                    handleRemoveItem(removeConflictBtn.dataset.id);
+                    return;
+                }
+
+                const swapItem = e.target.closest('.conflict-swap-item');
+                if (swapItem) {
+                    const mainId = swapItem.dataset.mainId;
+                    const conflictId = swapItem.dataset.conflictId;
+                    const mainConcertIndex = userSelections.findIndex(c => c.id === mainId);
+                    const conflictConcertIndex = userSelections.findIndex(c => c.id === conflictId);
+
+                    if (mainConcertIndex > -1 && conflictConcertIndex > -1) {
+                        const mainPriority = userSelections[mainConcertIndex].priority;
+                        userSelections[mainConcertIndex].priority = userSelections[conflictConcertIndex].priority;
+                        userSelections[conflictConcertIndex].priority = mainPriority;
+
+                        saveSelections();
+                        renderConcertList();
+                        updateItinerary(conflictId);
+                    }
+                    return;
+                }
+
+                const conflictIcon = e.target.closest('.conflict-icon');
+                if (conflictIcon) {
+                    handleConflictIconClick(conflictIcon);
+                    return;
+                }
+            };
+            
             const clearPlan = () => {
                 userSelections = [];
                 saveSelections();
@@ -509,9 +588,9 @@
             themeToggleBtn.addEventListener('click', toggleTheme);
             concertListContainer.addEventListener('click', handleAddClick);
             concertListContainer.addEventListener('click', handlePriorityClick);
+            itineraryListContainer.addEventListener('click', handleItineraryClick);
             clearPlanBtn.addEventListener('click', clearPlan);
         });
-
     </script>
 </body>
 </html>

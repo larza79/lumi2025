@@ -196,11 +196,16 @@
               <div id="day-filters" class="flex flex-wrap gap-x-4 gap-y-2">
                 <!-- Day checkboxes will be injected here -->
               </div>
-            </div>
-            <div class="mt-4">
+            </div>            <div class="mt-4">
               <h4 class="font-medium mb-2">Filter by Stage</h4>
               <div id="stage-filters" class="flex flex-wrap gap-x-4 gap-y-2">
                 <!-- Stage checkboxes will be injected here -->
+              </div>
+            </div>
+            <div class="mt-4">
+              <h4 class="font-medium mb-2">Filter by Priority</h4>
+              <div id="priority-filters" class="flex flex-wrap gap-x-4 gap-y-2">
+                <!-- Priority checkboxes will be injected here -->
               </div>
             </div>
           </div>
@@ -210,11 +215,10 @@
 
         <!-- Itinerary Column -->
         <div class="lg:col-span-1">
-          <div class="sticky top-8 bg-white p-6 rounded-2xl shadow-lg card">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">
+          <div class="sticky top-8 bg-white p-6 rounded-2xl shadow-lg card">            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">
               Your Itinerary
             </h2>
-            <div id="itinerary-list" class="space-y-4"></div>
+            <div id="itinerary-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2"></div>
             <button
               id="clear-plan-btn"
               class="mt-6 w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow transition-transform transform hover:scale-105 hidden"
@@ -1351,14 +1355,15 @@
           const newTheme = htmlEl.classList.contains("dark") ? "light" : "dark";
           localStorage.setItem("theme", newTheme);
           applyTheme(newTheme);
-        };
-
-        // --- LocalStorage ---
-        const saveSelections = () =>
+        };        // --- LocalStorage ---
+        const saveSelections = () => {
           localStorage.setItem(
             "festivalPlannerSelections",
             JSON.stringify(userSelections)
           );
+          // Dispatch event so other components can react to selection changes
+          document.dispatchEvent(new CustomEvent('selectionsUpdated'));
+        };
         const loadSelections = () => {
           const savedData = localStorage.getItem("festivalPlannerSelections");
           if (savedData) userSelections = JSON.parse(savedData);
@@ -1370,9 +1375,12 @@
           return hours * 60 + minutes;
         };
         const getDuration = (start, end) =>
-          timeToMinutes(end) - timeToMinutes(start);
-        const checkConflict = (concertA, concertB) => {
+          timeToMinutes(end) - timeToMinutes(start);        const checkConflict = (concertA, concertB) => {
           if (!concertA || !concertB) return false;
+          
+          // Only check for conflicts if concerts are on the same day
+          if (concertA.date !== concertB.date) return false;
+          
           const startA = timeToMinutes(concertA.startTime);
           const endA = timeToMinutes(concertA.endTime);
           const startB = timeToMinutes(concertB.startTime);
@@ -1409,9 +1417,7 @@
         };
 
         const getUniqueValues = (key) =>
-          [...new Set(concertData.map((item) => item[key]))].sort();
-
-        const applyFiltersAndRender = () => {
+          [...new Set(concertData.map((item) => item[key]))].sort();        const applyFiltersAndRender = () => {
           const artistSearch = document
             .getElementById("artist-search")
             .value.toLowerCase();
@@ -1420,7 +1426,16 @@
           ].map((el) => el.value);
           const selectedStages = [
             ...document.querySelectorAll("#stage-filters input:checked"),
-          ].map((el) => el.value);
+          ].map((el) => el.value);          const selectedPriorityInputs = [
+            ...document.querySelectorAll("#priority-filters input:checked"),
+          ];
+          
+          // Separate numeric priorities from "not-selected" special case
+          const selectedPriorities = selectedPriorityInputs
+            .filter(el => el.value !== notSelectedValue)
+            .map(el => parseInt(el.value, 10));
+            
+          const isNotSelectedChecked = selectedPriorityInputs.some(el => el.value === notSelectedValue);
 
           const filteredConcerts = concertData.filter((concert) => {
             const artistMatch = concert.artist
@@ -1431,7 +1446,26 @@
             const stageMatch =
               selectedStages.length === 0 ||
               selectedStages.includes(concert.stage);
-            return artistMatch && dayMatch && stageMatch;
+              
+            // Check if this concert is in userSelections
+            const existingSelection = userSelections.find(s => s.id === concert.id);
+            const isSelected = !!existingSelection;
+            
+            // For priority, handle both numeric priorities and the "not selected" case
+            let priorityMatch = selectedPriorityInputs.length === 0; // If no filters selected, match all
+            
+            if (!priorityMatch) {
+              if (isNotSelectedChecked && !isSelected) {
+                // If "Not selected" is checked and this concert isn't selected, it's a match
+                priorityMatch = true;              } else if (selectedPriorities.length > 0 && isSelected) {
+                // If numeric priorities are selected and this concert has one of those priorities
+                priorityMatch = selectedPriorities.includes(existingSelection.priority);
+              }
+            }
+            
+            return artistMatch && dayMatch && stageMatch && priorityMatch;
+              
+            return artistMatch && dayMatch && stageMatch && priorityMatch;
           });
 
           renderFilteredConcerts(filteredConcerts);
@@ -1537,17 +1571,24 @@
           const winners = [...userSelections].filter((s) =>
             winnerIds.has(s.id)
           );
-          const itineraryByDay = {};
-          winners
+          const itineraryByDay = {};          winners
             .sort(
               (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
             )
             .forEach((winner) => {
               const day = winner.day;
               if (!itineraryByDay[day]) itineraryByDay[day] = [];
-              const conflicts = userSelections.filter(
-                (c) => c.id !== winner.id && checkConflict(c, winner)
-              );
+              
+              // Get conflicts and sort them by start time first, then by priority
+              const conflicts = userSelections
+                .filter(c => c.id !== winner.id && checkConflict(c, winner))
+                .sort((a, b) => {
+                  // First sort by start time
+                  const timeCompare = timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+                  // If start times are equal, sort by priority (lower priority number comes first)
+                  return timeCompare !== 0 ? timeCompare : a.priority - b.priority;
+                });
+                
               itineraryByDay[day].push({
                 concert: winner,
                 conflicts: conflicts,
@@ -1670,58 +1711,113 @@
           const concert = concertData.find((c) => c.id === concertId);
           const existingSelectionIndex = userSelections.findIndex(
             (s) => s.id === concertId
-          );
-
-          if (existingSelectionIndex > -1) {
+          );          if (existingSelectionIndex > -1) {
             userSelections.splice(existingSelectionIndex, 1);
           } else {
             const concertElement = button.closest(".concert-item");
             const selectedPriorityBtn = concertElement.querySelector(
               ".priority-btn-group .btn-selected"
             );
-            let assignedPriority;
-
+            
+            // Add the concert with priority 1 as default (will be adjusted by recalculation)
+            const newConcert = { 
+              ...concert, 
+              priority: 1 
+            };
+            userSelections.push(newConcert);
+            
+            // If a priority button was manually selected, force that priority
             if (selectedPriorityBtn) {
-              assignedPriority = parseInt(
+              const forcedPriority = parseInt(
                 selectedPriorityBtn.dataset.priority,
                 10
               );
-              const concertToChange = {
-                ...concert,
-                priority: assignedPriority,
-              };
-              userSelections.forEach((selection) => {
-                if (
-                  checkConflict(selection, concertToChange) &&
-                  selection.priority >= assignedPriority
-                ) {
-                  selection.priority = Math.min(3, assignedPriority + 1);
-                }
+              
+              // Force the priority for the newly added concert
+              recalculatePriorities({
+                [newConcert.id]: forcedPriority
               });
             } else {
-              // Smart auto-priority logic
-              let finalPriority = 1;
-              if (
-                userSelections.some(
-                  (s) => checkConflict(s, concert) && s.priority === 1
-                )
-              ) {
-                finalPriority = 2;
-                if (
-                  userSelections.some(
-                    (s) =>
-                      checkConflict(s, { ...concert, priority: 2 }) &&
-                      s.priority <= 2
-                  )
-                ) {
-                  finalPriority = 3;
-                }
-              }
-              assignedPriority = finalPriority;
+              // No forced priority, just recalculate all based on conflicts
+              recalculatePriorities();
             }
-            userSelections.push({ ...concert, priority: assignedPriority });
           }
           refreshAll();
+        };        // Recalculate priorities for all concerts based on conflicts
+        const recalculatePriorities = (forcedPriorities = {}) => {
+          // Create a copy of the selections for processing
+          const concertsToProcess = userSelections.map(c => ({
+            ...c,
+            // Apply forced priorities or keep existing priority
+            priority: forcedPriorities[c.id] || c.priority
+          }));
+          
+          // Sort concerts by their priority (P1 first)
+          concertsToProcess.sort((a, b) => a.priority - b.priority);
+          
+          // Build a graph of conflicts for each concert
+          const conflictGraph = {};
+          concertsToProcess.forEach(concert => {
+            conflictGraph[concert.id] = concertsToProcess
+              .filter(c => c.id !== concert.id && checkConflict(c, concert))
+              .map(c => c.id);
+          });
+          
+          // Process each concert and resolve conflicts
+          concertsToProcess.forEach(concert => {
+            const conflicts = conflictGraph[concert.id];
+            
+            // If this concert has a forced priority, adjust conflicting concerts
+            if (forcedPriorities[concert.id]) {
+              const forcedPriority = forcedPriorities[concert.id];
+              
+              conflicts.forEach(conflictId => {
+                const conflictConcert = concertsToProcess.find(c => c.id === conflictId);
+                if (conflictConcert && conflictConcert.priority <= forcedPriority) {
+                  // Only bump priority if not already forced
+                  if (!forcedPriorities[conflictId]) {
+                    // If forced P1, conflict becomes P2; if forced P2, conflict becomes P3
+                    conflictConcert.priority = Math.min(3, forcedPriority + 1);
+                  }
+                }
+              });
+            } 
+            // Otherwise, try to get the highest priority possible
+            else {
+              // Get priorities of all conflicts
+              const conflictPriorities = conflicts.map(id => 
+                concertsToProcess.find(c => c.id === id).priority
+              );
+              
+              // If no conflicts, can be P1
+              if (conflictPriorities.length === 0) {
+                concert.priority = 1;
+              }
+              // Otherwise, find the lowest usable priority
+              else {
+                // Try P1 first
+                if (!conflictPriorities.includes(1)) {
+                  concert.priority = 1;
+                } 
+                // Then try P2
+                else if (!conflictPriorities.includes(2)) {
+                  concert.priority = 2;
+                }
+                // Default to P3 if necessary
+                else {
+                  concert.priority = 3;
+                }
+              }
+            }
+          });
+          
+          // Update the original selections with new priorities
+          concertsToProcess.forEach(processed => {
+            const selection = userSelections.find(s => s.id === processed.id);
+            if (selection) {
+              selection.priority = processed.priority;
+            }
+          });
         };
 
         const handlePriorityClick = (e) => {
@@ -1737,19 +1833,13 @@
           );
 
           if (selectionIndex > -1) {
-            const concertToChange = userSelections[selectionIndex];
-
-            userSelections.forEach((selection) => {
-              if (
-                selection.id !== concertId &&
-                checkConflict(selection, concertToChange) &&
-                selection.priority >= newPriority
-              ) {
-                selection.priority = Math.min(3, newPriority + 1);
-              }
-            });
-            userSelections[selectionIndex].priority = newPriority;
-
+            // Force this concert's priority to the selected value
+            const forcedPriorities = {
+              [concertId]: newPriority
+            };            // Recalculate all priorities with this constraint
+            recalculatePriorities(forcedPriorities);
+            
+            // Refresh the UI once with the updated priorities
             refreshAll();
           } else {
             const allPriorityButtons =
@@ -1809,33 +1899,44 @@
         const clearPlan = () => {
           userSelections = [];
           refreshAll();
-        };
-
-        const initializeFilters = () => {
+        };        const initializeFilters = () => {
           const dayFilterContainer = document.getElementById("day-filters");
           const stageFilterContainer = document.getElementById("stage-filters");
+          const priorityFilterContainer = document.getElementById("priority-filters");
           const artistSearchInput = document.getElementById("artist-search");
           const resetBtn = document.getElementById("reset-filters-btn");
 
-          const dayOrder = ["Thursday", "Friday", "Saturday", "Sunday"];
-          const uniqueDays = getUniqueValues("day").sort(
+          const dayOrder = ["Thursday", "Friday", "Saturday", "Sunday"];          const uniqueDays = getUniqueValues("day").sort(
             (a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b)
           );
           const uniqueStages = getUniqueValues("stage");
+          const priorities = [1, 2, 3];
+          const notSelectedValue = "not-selected";
 
           uniqueDays.forEach((day) => {
             const checkboxDiv = document.createElement("div");
             checkboxDiv.className = "flex items-center";
             checkboxDiv.innerHTML = `<input id="day-${day}" value="${day}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="day-${day}" class="ml-2">${day}</label>`;
             dayFilterContainer.appendChild(checkboxDiv);
-          });
-
-          uniqueStages.forEach((stage) => {
+          });          uniqueStages.forEach((stage) => {
             const checkboxDiv = document.createElement("div");
             checkboxDiv.className = "flex items-center";
             checkboxDiv.innerHTML = `<input id="stage-${stage}" value="${stage}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="stage-${stage}" class="ml-2">${stage}</label>`;
             stageFilterContainer.appendChild(checkboxDiv);
           });
+            // Add priority filters
+          priorities.forEach((priority) => {
+            const checkboxDiv = document.createElement("div");
+            checkboxDiv.className = "flex items-center";
+            checkboxDiv.innerHTML = `<input id="priority-${priority}" value="${priority}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="priority-${priority}" class="ml-2">P${priority}</label>`;
+            priorityFilterContainer.appendChild(checkboxDiv);
+          });
+          
+          // Add the "Not selected" checkbox
+          const notSelectedDiv = document.createElement("div");
+          notSelectedDiv.className = "flex items-center";
+          notSelectedDiv.innerHTML = `<input id="priority-${notSelectedValue}" value="${notSelectedValue}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="priority-${notSelectedValue}" class="ml-2">Not selected</label>`;
+          priorityFilterContainer.appendChild(notSelectedDiv);
 
           artistSearchInput.addEventListener("input", applyFiltersAndRender);
           dayFilterContainer.addEventListener("change", applyFiltersAndRender);
@@ -1843,14 +1944,50 @@
             "change",
             applyFiltersAndRender
           );
-
-          resetBtn.addEventListener("click", () => {
+          priorityFilterContainer.addEventListener(
+            "change",
+            applyFiltersAndRender
+          );          resetBtn.addEventListener("click", () => {
             artistSearchInput.value = "";
             document
               .querySelectorAll('#filter-container input[type="checkbox"]')
               .forEach((cb) => (cb.checked = false));
             applyFiltersAndRender();
-          });
+          });          // Always show priority filter section and update styling
+          const updatePriorityFilterVisibility = () => {
+            const priorityFilterSection = priorityFilterContainer.closest('div.mt-4');
+            priorityFilterSection.style.display = 'block';
+            
+            // Update the priority checkboxes to show counts
+            priorities.forEach(priority => {
+              const checkbox = document.getElementById(`priority-${priority}`);
+              const label = checkbox.nextElementSibling;
+              const count = userSelections.filter(s => s.priority === priority).length;
+              
+              if (count > 0) {
+                label.innerHTML = `P${priority} <span class="ml-1 px-2 py-0.5 text-xs bg-indigo-100 text-indigo-800 rounded-full">${count}</span>`;
+              } else {
+                label.innerHTML = `P${priority}`;
+              }
+            });
+            
+            // Update the "Not selected" checkbox to show count
+            const notSelectedCheckbox = document.getElementById(`priority-${notSelectedValue}`);
+            const notSelectedLabel = notSelectedCheckbox.nextElementSibling;
+            const notSelectedCount = concertData.length - userSelections.length;
+            
+            if (notSelectedCount > 0) {
+              notSelectedLabel.innerHTML = `Not selected <span class="ml-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">${notSelectedCount}</span>`;
+            } else {
+              notSelectedLabel.innerHTML = 'Not selected';
+            }
+          };
+            // Initial call to set visibility
+          updatePriorityFilterVisibility();
+          
+          // Update visibility whenever selections change or after filter reset
+          document.addEventListener('selectionsUpdated', updatePriorityFilterVisibility);
+          resetBtn.addEventListener('click', () => setTimeout(updatePriorityFilterVisibility, 50));
         };
 
         // --- Initialisation ---

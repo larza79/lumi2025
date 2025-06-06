@@ -44,6 +44,12 @@
       .concert-item.selected:hover {
         background-color: #a7f3d0; /* emerald-200 */
       }
+      .concert-item.selected-conflict {
+        background-color: #fef3c7; /* amber-100 */
+      }
+      .concert-item.selected-conflict:hover {
+        background-color: #fde68a; /* amber-200 */
+      }
 
       /* --- Dark Mode Styles --- */
       .dark body {
@@ -75,6 +81,12 @@
       .dark .concert-item.selected:hover {
         background-color: #047857;
       }
+      .dark .concert-item.selected-conflict {
+        background-color: #78350f;
+      } /* amber-800 */
+      .dark .concert-item.selected-conflict:hover {
+        background-color: #92400e;
+      } /* amber-900 */
       .dark .day-header,
       .dark .itinerary-day-header {
         background-color: #1f2937;
@@ -1445,6 +1457,7 @@
         const htmlEl = document.documentElement;
 
         let userSelections = [];
+        let winnerIds = new Set();
 
         // --- Theme Management ---
         const applyTheme = (theme) => {
@@ -1489,7 +1502,30 @@
           return overlap > 15;
         };
 
+        // --- Main UI Refresh Logic ---
+        const refreshAll = () => {
+          updateWinners();
+          applyFiltersAndRender();
+          updateItinerary();
+          saveSelections();
+        };
+
         // --- Data Processing & Filtering ---
+        const updateWinners = () => {
+          const sortedSelections = [...userSelections].sort((a, b) => {
+            if (a.priority !== b.priority) return a.priority - b.priority;
+            return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+          });
+
+          const winners = [];
+          sortedSelections.forEach((concert) => {
+            if (!winners.some((winner) => checkConflict(concert, winner))) {
+              winners.push(concert);
+            }
+          });
+          winnerIds = new Set(winners.map((w) => w.id));
+        };
+
         const getUniqueValues = (key) =>
           [...new Set(concertData.map((item) => item[key]))].sort();
 
@@ -1556,8 +1592,13 @@
                 );
                 const isAdded = !!existingSelection;
 
+                concertEl.classList.remove("selected", "selected-conflict");
                 if (isAdded) {
-                  concertEl.classList.add("selected");
+                  if (winnerIds.has(concert.id)) {
+                    concertEl.classList.add("selected");
+                  } else {
+                    concertEl.classList.add("selected-conflict");
+                  }
                 }
 
                 const buttonContent = isAdded ? checkMarkSVG : "Add";
@@ -1616,18 +1657,9 @@
 
           clearPlanBtn.classList.remove("hidden");
 
-          const sortedSelections = [...userSelections].sort((a, b) => {
-            if (a.priority !== b.priority) return a.priority - b.priority;
-            return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
-          });
-
-          const winners = [];
-          sortedSelections.forEach((concert) => {
-            if (!winners.some((winner) => checkConflict(concert, winner))) {
-              winners.push(concert);
-            }
-          });
-
+          const winners = [...userSelections].filter((s) =>
+            winnerIds.has(s.id)
+          );
           const itineraryByDay = {};
           winners
             .sort(
@@ -1652,9 +1684,16 @@
           itineraryListContainer.innerHTML = "";
           const removeIconSVG = `<i class="fa-solid fa-xmark"></i>`;
 
-          if (Object.keys(itineraryByDay).length === 0) {
+          if (
+            Object.keys(itineraryByDay).length === 0 &&
+            userSelections.length > 0
+          ) {
             itineraryListContainer.innerHTML =
               '<p class="text-gray-500 font-semibold">All your selections might have conflicts. Try changing priorities.</p>';
+            return;
+          } else if (userSelections.length === 0) {
+            itineraryListContainer.innerHTML =
+              '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
             return;
           }
 
@@ -1780,7 +1819,7 @@
                   checkConflict(selection, concertToChange) &&
                   selection.priority >= assignedPriority
                 ) {
-                  selection.priority = Math.min(3, selection.priority + 1);
+                  selection.priority = Math.min(3, assignedPriority + 1);
                 }
               });
             } else {
@@ -1794,7 +1833,9 @@
                 finalPriority = 2;
                 if (
                   userSelections.some(
-                    (s) => checkConflict(s, concert) && s.priority === 2
+                    (s) =>
+                      checkConflict(s, { ...concert, priority: 2 }) &&
+                      s.priority <= 2
                   )
                 ) {
                   finalPriority = 3;
@@ -1804,9 +1845,7 @@
             }
             userSelections.push({ ...concert, priority: assignedPriority });
           }
-          saveSelections();
-          applyFiltersAndRender();
-          updateItinerary();
+          refreshAll();
         };
 
         const handlePriorityClick = (e) => {
@@ -1823,7 +1862,7 @@
 
           if (selectionIndex > -1) {
             const concertToChange = userSelections[selectionIndex];
-            // Demote conflicting concerts
+
             userSelections.forEach((selection) => {
               if (
                 selection.id !== concertId &&
@@ -1834,11 +1873,9 @@
               }
             });
             userSelections[selectionIndex].priority = newPriority;
-            saveSelections();
-            applyFiltersAndRender();
-            updateItinerary();
+
+            refreshAll();
           } else {
-            // This allows pre-selection before adding
             const allPriorityButtons =
               priorityGroup.querySelectorAll(".priority-btn");
             allPriorityButtons.forEach((btn) =>
@@ -1854,9 +1891,7 @@
           );
           if (indexToRemove > -1) {
             userSelections.splice(indexToRemove, 1);
-            saveSelections();
-            applyFiltersAndRender();
-            updateItinerary();
+            refreshAll();
           }
         };
 
@@ -1889,10 +1924,7 @@
               userSelections[mainConcertIndex].priority =
                 userSelections[conflictConcertIndex].priority;
               userSelections[conflictConcertIndex].priority = mainPriority;
-
-              saveSelections();
-              applyFiltersAndRender();
-              updateItinerary();
+              refreshAll();
             }
             return;
           }
@@ -1900,9 +1932,7 @@
 
         const clearPlan = () => {
           userSelections = [];
-          saveSelections();
-          applyFiltersAndRender();
-          updateItinerary();
+          refreshAll();
         };
 
         const initializeFilters = () => {
@@ -1956,8 +1986,7 @@
         applyTheme(initialTheme);
         loadSelections();
         initializeFilters();
-        applyFiltersAndRender();
-        updateItinerary();
+        refreshAll();
 
         // --- Event Listeners ---
         themeToggleBtn.addEventListener("click", toggleTheme);

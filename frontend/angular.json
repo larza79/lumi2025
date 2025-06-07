@@ -36,7 +36,7 @@
           },
           "configurations": {
             "production": {
-              "baseHref": "lumi2025",
+              "baseHref": "/lumi2025/",
               "budgets": [
                 {
                   "type": "initial",

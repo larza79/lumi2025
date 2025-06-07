@@ -21,6 +21,11 @@
   transform: scale(1.05);
 }
 
+/* Checkmark styling for selected concerts */
+.add-btn.added svg {
+  color: white !important;
+}
+
 .concert-item.selected {
   background-color: #d1fae5; /* emerald-100 */
 }
@@ -92,5 +97,10 @@
 
 :host-context(.dark) .priority-btn.btn-selected {
   background-color: #6366f1 !important;
+  color: white !important;
+}
+
+/* Dark mode checkmark styling for selected concerts */
+:host-context(.dark) .add-btn.added svg {
   color: white !important;
 }

@@ -1,1 +1,23 @@
 /* You can add global styles to this file, and also import other style files */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Styles */
+body {
+  font-family: "Inter", sans-serif;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Essential Dark Mode Overrides */
+.dark body {
+  background-color: #111827;
+  color: #d1d5db;
+}
+
+.dark .card {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+/* Let Tailwind handle most dark mode styles automatically */

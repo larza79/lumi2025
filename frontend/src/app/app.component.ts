@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 @Component({
@@ -6,6 +6,7 @@ import { RouterOutlet } from '@angular/router';
   imports: [RouterOutlet],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
+  encapsulation: ViewEncapsulation.None
 })
 export class AppComponent implements OnInit {
   concertData: any[] = [];
@@ -1277,10 +1278,24 @@ export class AppComponent implements OnInit {
           (a, b) =>
             ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a) -
             ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b)
-        )
-        .forEach((day) => {
+        )        .forEach((day) => {
           const dayHeader = document.createElement('h3');
-          dayHeader.className = 'concert-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 p-2 rounded-md';
+          dayHeader.className = 'concert-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
+          
+          // Determine day header state based on concerts in this day
+          const dayHasSelected = concertsByDay[day].some((concert: any) => 
+            userSelections.find(s => s.id === concert.id) && winnerIds.has(concert.id)
+          );
+          const dayHasConflicts = concertsByDay[day].some((concert: any) => 
+            userSelections.find(s => s.id === concert.id) && !winnerIds.has(concert.id)
+          );
+          
+          if (dayHasSelected && !dayHasConflicts) {
+            dayHeader.classList.add('selected');
+          } else if (dayHasConflicts) {
+            dayHeader.classList.add('selected-conflict');
+          }
+          
           dayHeader.textContent = day;
           concertListContainer.appendChild(dayHeader);
 
@@ -1327,7 +1342,7 @@ export class AppComponent implements OnInit {
                       <div class="priority-btn-group flex" data-id="${
                         concert.id
                       }">
-                          <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white" data-priority="1">P1</button><button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white" data-priority="2">P2</button><button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white" data-priority="3">P3</button>
+                          <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="1">P1</button><button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="2">P2</button><button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="3">P3</button>
                       </div>
                       <button class="${buttonClasses}" data-id="${
     concert.id
@@ -1335,15 +1350,14 @@ export class AppComponent implements OnInit {
                   </div>`;
             // Highlight the selected priority pill with bg-indigo-500 text-white
             if (isAdded) {
-              const priority = existingSelection.priority;
-              const priorityButtons = concertEl.querySelectorAll('.priority-btn');
+              const priority = existingSelection.priority;              const priorityButtons = concertEl.querySelectorAll('.priority-btn');
               priorityButtons.forEach((btn) => {
                 const btnPriority = parseInt((btn as HTMLElement).dataset['priority'] || '0', 10);
                 btn.classList.remove('bg-indigo-500', 'text-white', 'btn-selected');
-                btn.classList.add('bg-white', 'text-indigo-700');
+                btn.classList.add('bg-white', 'text-indigo-700', 'dark:bg-gray-600', 'dark:text-gray-200');
                 if (btnPriority === priority) {
-                  btn.classList.remove('bg-white', 'text-indigo-700');
-                  btn.classList.add('bg-indigo-500', 'text-white', 'btn-selected');
+                  btn.classList.remove('bg-white', 'text-indigo-700', 'dark:bg-gray-600', 'dark:text-gray-200');
+                  btn.classList.add('bg-indigo-500', 'text-white', 'btn-selected', 'dark:bg-indigo-600');
                 }
               });
             }
@@ -1406,10 +1420,24 @@ export class AppComponent implements OnInit {
       }
 
       Object.keys(itineraryByDay)
-        .sort((a, b) => ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a as string) - ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b as string))
-        .forEach((day) => {
+        .sort((a, b) => ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a as string) - ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b as string))        .forEach((day) => {
           const dayHeader = document.createElement('h3');
-          dayHeader.className = 'itinerary-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 p-2 rounded-md';
+          dayHeader.className = 'itinerary-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
+          
+          // Determine day header state based on concerts in this day
+          const dayHasWinners = itineraryByDay[day].some((item: any) => 
+            winnerIds.has(item.concert.id)
+          );
+          const dayHasConflicts = itineraryByDay[day].some((item: any) => 
+            !winnerIds.has(item.concert.id)
+          );
+          
+          if (dayHasWinners && !dayHasConflicts) {
+            dayHeader.classList.add('selected');
+          } else if (dayHasConflicts) {
+            dayHeader.classList.add('selected-conflict');
+          }
+          
           dayHeader.textContent = day;
           itineraryListContainer.appendChild(dayHeader);
 

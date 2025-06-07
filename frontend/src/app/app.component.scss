@@ -1,0 +1,123 @@
+body {
+  font-family: "Inter", sans-serif;
+  transition: background-color 0.3s, color 0.3s;
+}
+.priority-btn-group .btn-selected {
+  background-color: #4f46e5;
+  color: white;
+}
+.add-btn.added {
+  background-color: #10b981;
+  color: white;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+.add-btn.added:hover {
+  transform: scale(1.05);
+}
+.concert-item.selected {
+  background-color: #d1fae5; /* emerald-100 */
+}
+.concert-item.selected:hover {
+  background-color: #a7f3d0; /* emerald-200 */
+}
+.concert-item.selected-conflict {
+  background-color: #fef3c7; /* amber-100 */
+}
+.concert-item.selected-conflict:hover {
+  background-color: #fde68a; /* amber-200 */
+}
+
+/* --- Dark Mode Styles --- */
+.dark body {
+  background-color: #111827;
+  color: #d1d5db;
+}
+.dark .card {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+.dark .text-indigo-600 {
+  color: #818cf8;
+}
+.dark .text-gray-600 {
+  color: #9ca3af;
+}
+.dark .text-gray-500 {
+  color: #6b7280;
+}
+.dark .border-b {
+  border-color: #374151;
+}
+.dark .concert-item:hover {
+  background-color: #374151;
+}
+.dark .concert-item.selected {
+  background-color: #064e3b;
+}
+.dark .concert-item.selected:hover {
+  background-color: #047857;
+}
+.dark .concert-item.selected-conflict {
+  background-color: #78350f;
+} /* amber-800 */
+.dark .concert-item.selected-conflict:hover {
+  background-color: #92400e;
+} /* amber-900 */
+.dark .day-header,
+.dark .itinerary-day-header {
+  background-color: #1f2937;
+}
+.dark .priority-btn {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+.dark .priority-btn.btn-selected {
+  background-color: #6366f1;
+  color: white;
+}
+.dark .bg-green-100 {
+  background-color: #042f2e;
+}
+.dark .text-green-800 {
+  color: #6ee7b7;
+}
+.dark .text-green-700 {
+  color: #a7f3d0;
+}
+.dark .border-green-500 {
+  border-color: #10b981;
+}
+.dark .bg-yellow-100 {
+  background-color: #422006;
+}
+.dark .text-yellow-800 {
+  color: #fcd34d;
+}
+.dark .text-yellow-700 {
+  color: #fde68a;
+}
+.dark .border-yellow-500 {
+  border-color: #f59e0b;
+}
+.dark .hover\:bg-yellow-200:hover {
+  background-color: #78350f;
+}
+.dark .bg-gray-50 {
+  background-color: #374151;
+}
+.dark input[type="text"],
+.dark input[type="checkbox"] {
+  background-color: #1f2937;
+  border-color: #4b5563;
+}
+.dark input[type="checkbox"]:checked {
+  background-color: #4f46e5;
+}

@@ -13,6 +13,27 @@ export class AppComponent implements OnInit {
   ngOnInit(): void {
     this.initData();
     this.initApp();
+    // Ensure theme is set correctly on load
+    const htmlEl = document.documentElement;
+    const lightIcon = document.getElementById('theme-icon-light') as HTMLElement | null;
+    const darkIcon = document.getElementById('theme-icon-dark') as HTMLElement | null;
+    const initialTheme =
+      localStorage.getItem('theme') ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    htmlEl.classList.toggle('dark', initialTheme === 'dark');
+    if (darkIcon) darkIcon.classList.toggle('hidden', initialTheme !== 'dark');
+    if (lightIcon) lightIcon.classList.toggle('hidden', initialTheme === 'dark');
+  }
+
+  onThemeToggle(): void {
+    const htmlEl = document.documentElement;
+    const lightIcon = document.getElementById('theme-icon-light') as HTMLElement | null;
+    const darkIcon = document.getElementById('theme-icon-dark') as HTMLElement | null;
+    const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
+    localStorage.setItem('theme', newTheme);
+    htmlEl.classList.toggle('dark', newTheme === 'dark');
+    if (darkIcon) darkIcon.classList.toggle('hidden', newTheme !== 'dark');
+    if (lightIcon) lightIcon.classList.toggle('hidden', newTheme === 'dark');
   }
 
   private initData(): void {
@@ -1123,25 +1144,10 @@ export class AppComponent implements OnInit {
     const concertListContainer = document.getElementById('concert-list') as HTMLElement | null;
     const itineraryListContainer = document.getElementById('itinerary-list') as HTMLElement | null;
     const clearPlanBtn = document.getElementById('clear-plan-btn') as HTMLElement | null;
-    const themeToggleBtn = document.getElementById('theme-toggle') as HTMLElement | null;
-    const lightIcon = document.getElementById('theme-icon-light') as HTMLElement | null;
-    const darkIcon = document.getElementById('theme-icon-dark') as HTMLElement | null;
-    const htmlEl = document.documentElement;
-
+    // Removed themeToggleBtn, lightIcon, darkIcon, htmlEl, and theme event logic (now handled by Angular binding)
     let userSelections: any[] = [];
     let winnerIds = new Set<string>();
 
-    // --- Theme Management ---
-    const applyTheme = (theme: string) => {
-      htmlEl.classList.toggle('dark', theme === 'dark');
-      if (darkIcon) darkIcon.classList.toggle('hidden', theme !== 'dark');
-      if (lightIcon) lightIcon.classList.toggle('hidden', theme === 'dark');
-    };
-    const toggleTheme = () => {
-      const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
-      localStorage.setItem('theme', newTheme);
-      applyTheme(newTheme);
-    };
     // --- LocalStorage ---
     const saveSelections = () => {
       localStorage.setItem(
@@ -1775,18 +1781,12 @@ export class AppComponent implements OnInit {
     };
 
     // --- Initialisation ---
-    const initialTheme =
-      localStorage.getItem('theme') ||
-      (window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light');
-    applyTheme(initialTheme);
+    // Removed initialTheme/applyTheme logic (now handled in ngOnInit)
     loadSelections();
     initializeFilters();
     refreshAll();
-
     // --- Event Listeners ---
-    if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+    // Removed theme toggle event listener (now handled by Angular binding)
     const concertListElement = document.getElementById('concert-list') as HTMLElement | null;
     if (concertListElement) {
       concertListElement.addEventListener('click', (e: Event) => {

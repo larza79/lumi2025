@@ -1,35 +1,82 @@
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  ViewEncapsulation,
+  HostListener,
+} from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, CommonModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
-  encapsulation: ViewEncapsulation.None
+  encapsulation: ViewEncapsulation.None,
+  standalone: true,
 })
 export class AppComponent implements OnInit {
   concertData: any[] = [];
+  activeTab: 'concerts' | 'itinerary' = 'concerts';
+  isMobile = false;
+  showFilter = false; // Hide filter by default on mobile
+
+  @HostListener('window:resize', ['$event'])
+  onResize() {
+    this.checkScreenSize();
+  }
 
   ngOnInit(): void {
     this.initData();
     this.initApp();
+    this.checkScreenSize();
+
     // Ensure theme is set correctly on load
     const htmlEl = document.documentElement;
-    const lightIcon = document.getElementById('theme-icon-light') as HTMLElement | null;
-    const darkIcon = document.getElementById('theme-icon-dark') as HTMLElement | null;
+    const lightIcon = document.getElementById(
+      'theme-icon-light'
+    ) as HTMLElement | null;
+    const darkIcon = document.getElementById(
+      'theme-icon-dark'
+    ) as HTMLElement | null;
     const initialTheme =
       localStorage.getItem('theme') ||
-      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      (window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light');
     htmlEl.classList.toggle('dark', initialTheme === 'dark');
     if (darkIcon) darkIcon.classList.toggle('hidden', initialTheme !== 'dark');
-    if (lightIcon) lightIcon.classList.toggle('hidden', initialTheme === 'dark');
+    if (lightIcon)
+      lightIcon.classList.toggle('hidden', initialTheme === 'dark');
+  }
+
+  checkScreenSize() {
+    const wasMobile = this.isMobile;
+    this.isMobile = window.innerWidth < 1024;
+
+    // Always show filter on desktop
+    if (!this.isMobile && wasMobile) {
+      this.showFilter = true;
+    }
+
+    // Hide filter by default when switching to mobile
+    if (this.isMobile && !wasMobile) {
+      this.showFilter = false;
+    }
+  }
+
+  toggleFilter() {
+    this.showFilter = !this.showFilter;
   }
 
   onThemeToggle(): void {
     const htmlEl = document.documentElement;
-    const lightIcon = document.getElementById('theme-icon-light') as HTMLElement | null;
-    const darkIcon = document.getElementById('theme-icon-dark') as HTMLElement | null;
+    const lightIcon = document.getElementById(
+      'theme-icon-light'
+    ) as HTMLElement | null;
+    const darkIcon = document.getElementById(
+      'theme-icon-dark'
+    ) as HTMLElement | null;
     const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
     localStorage.setItem('theme', newTheme);
     htmlEl.classList.toggle('dark', newTheme === 'dark');
@@ -1142,9 +1189,15 @@ export class AppComponent implements OnInit {
 
   private initApp(): void {
     // --- Elements ---
-    const concertListContainer = document.getElementById('concert-list') as HTMLElement | null;
-    const itineraryListContainer = document.getElementById('itinerary-list') as HTMLElement | null;
-    const clearPlanBtn = document.getElementById('clear-plan-btn') as HTMLElement | null;
+    const concertListContainer = document.getElementById(
+      'concert-list'
+    ) as HTMLElement | null;
+    const itineraryListContainer = document.getElementById(
+      'itinerary-list'
+    ) as HTMLElement | null;
+    const clearPlanBtn = document.getElementById(
+      'clear-plan-btn'
+    ) as HTMLElement | null;
     // Removed themeToggleBtn, lightIcon, darkIcon, htmlEl, and theme event logic (now handled by Angular binding)
     let userSelections: any[] = [];
     let winnerIds = new Set<string>();
@@ -1176,7 +1229,10 @@ export class AppComponent implements OnInit {
       const endA = timeToMinutes(concertA.endTime);
       const startB = timeToMinutes(concertB.startTime);
       const endB = timeToMinutes(concertB.endTime);
-      const overlap = Math.max(0, Math.min(endA, endB) - Math.max(startA, startB));
+      const overlap = Math.max(
+        0,
+        Math.min(endA, endB) - Math.max(startA, startB)
+      );
       return overlap > 15;
     };
 
@@ -1208,11 +1264,27 @@ export class AppComponent implements OnInit {
     const getUniqueValues = (key: string): string[] =>
       [...new Set(this.concertData.map((item: any) => item[key]))].sort();
     const applyFiltersAndRender = () => {
-      const artistSearchInput = document.getElementById('artist-search') as HTMLInputElement | null;
-      const artistSearch = artistSearchInput ? artistSearchInput.value.toLowerCase() : '';
-      const selectedDays = Array.from(document.querySelectorAll<HTMLInputElement>('#day-filters input:checked')).map((el) => el.value);
-      const selectedStages = Array.from(document.querySelectorAll<HTMLInputElement>('#stage-filters input:checked')).map((el) => el.value);
-      const selectedPriorityInputs = Array.from(document.querySelectorAll<HTMLInputElement>('#priority-filters input:checked'));
+      const artistSearchInput = document.getElementById(
+        'artist-search'
+      ) as HTMLInputElement | null;
+      const artistSearch = artistSearchInput
+        ? artistSearchInput.value.toLowerCase()
+        : '';
+      const selectedDays = Array.from(
+        document.querySelectorAll<HTMLInputElement>(
+          '#day-filters input:checked'
+        )
+      ).map((el) => el.value);
+      const selectedStages = Array.from(
+        document.querySelectorAll<HTMLInputElement>(
+          '#stage-filters input:checked'
+        )
+      ).map((el) => el.value);
+      const selectedPriorityInputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>(
+          '#priority-filters input:checked'
+        )
+      );
 
       // Separate numeric priorities from "not-selected" special case
       const selectedPriorities = selectedPriorityInputs
@@ -1267,35 +1339,44 @@ export class AppComponent implements OnInit {
         concertListContainer.innerHTML = `<p class="text-center text-gray-500 mt-8">No concerts match your filters.</p>`;
         return;
       }
-      const concertsByDay = concertsToRender.reduce((acc: Record<string, any[]>, concert: any) => {
-        if (!acc[concert.day]) acc[concert.day] = [];
-        acc[concert.day].push(concert);
-        return acc;
-      }, {});
+      const concertsByDay = concertsToRender.reduce(
+        (acc: Record<string, any[]>, concert: any) => {
+          if (!acc[concert.day]) acc[concert.day] = [];
+          acc[concert.day].push(concert);
+          return acc;
+        },
+        {}
+      );
 
       Object.keys(concertsByDay)
         .sort(
           (a, b) =>
             ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a) -
             ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b)
-        )        .forEach((day) => {
+        )
+        .forEach((day) => {
           const dayHeader = document.createElement('h3');
-          dayHeader.className = 'concert-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
-          
+          dayHeader.className =
+            'concert-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
+
           // Determine day header state based on concerts in this day
-          const dayHasSelected = concertsByDay[day].some((concert: any) => 
-            userSelections.find(s => s.id === concert.id) && winnerIds.has(concert.id)
+          const dayHasSelected = concertsByDay[day].some(
+            (concert: any) =>
+              userSelections.find((s) => s.id === concert.id) &&
+              winnerIds.has(concert.id)
           );
-          const dayHasConflicts = concertsByDay[day].some((concert: any) => 
-            userSelections.find(s => s.id === concert.id) && !winnerIds.has(concert.id)
+          const dayHasConflicts = concertsByDay[day].some(
+            (concert: any) =>
+              userSelections.find((s) => s.id === concert.id) &&
+              !winnerIds.has(concert.id)
           );
-          
+
           if (dayHasSelected && !dayHasConflicts) {
             dayHeader.classList.add('selected');
           } else if (dayHasConflicts) {
             dayHeader.classList.add('selected-conflict');
           }
-          
+
           dayHeader.textContent = day;
           concertListContainer.appendChild(dayHeader);
 
@@ -1308,7 +1389,12 @@ export class AppComponent implements OnInit {
             );
             const isAdded = !!existingSelection;
 
-            concertEl.classList.remove('selected', 'selected-conflict', 'bg-green-100', 'bg-yellow-100');
+            concertEl.classList.remove(
+              'selected',
+              'selected-conflict',
+              'bg-green-100',
+              'bg-yellow-100'
+            );
             if (isAdded) {
               if (winnerIds.has(concert.id)) {
                 concertEl.classList.add('selected', 'bg-green-100');
@@ -1318,7 +1404,8 @@ export class AppComponent implements OnInit {
             }
 
             // Ensure checkMarkSVG is defined before use
-            const checkMarkSVG = '<svg class="inline w-4 h-4 mr-1 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>';
+            const checkMarkSVG =
+              '<svg class="inline w-4 h-4 mr-1 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>';
             const buttonContent = isAdded ? checkMarkSVG : 'Add';
             const buttonClasses = isAdded
               ? 'add-btn added'
@@ -1326,17 +1413,15 @@ export class AppComponent implements OnInit {
 
             concertEl.innerHTML = `
                   <div class="flex-grow mb-2 sm:mb-0">
-                      <p class="font-semibold text-lg">${
-                        concert.artist
-                      }</p>
-                      <p class="text-sm text-gray-600">${
-                        concert.startTime
-                      } - ${concert.endTime} (${getDuration(
-    concert.startTime,
-    concert.endTime
-  )} mins)</p>                                <p class="text-sm text-indigo-500 font-medium">${
-    concert.stage
-  }</p>
+                      <p class="font-semibold text-lg">${concert.artist}</p>
+                      <p class="text-sm text-gray-600">${concert.startTime} - ${
+              concert.endTime
+            } (${getDuration(
+              concert.startTime,
+              concert.endTime
+            )} mins)</p>                                <p class="text-sm text-indigo-500 font-medium">${
+              concert.stage
+            }</p>
                   </div>
                   <div class="flex items-center space-x-2">
                       <div class="priority-btn-group flex" data-id="${
@@ -1345,19 +1430,43 @@ export class AppComponent implements OnInit {
                           <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="1">P1</button><button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="2">P2</button><button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="3">P3</button>
                       </div>
                       <button class="${buttonClasses}" data-id="${
-    concert.id
-  }">${buttonContent}</button>
+              concert.id
+            }">${buttonContent}</button>
                   </div>`;
             // Highlight the selected priority pill with bg-indigo-500 text-white
             if (isAdded) {
-              const priority = existingSelection.priority;              const priorityButtons = concertEl.querySelectorAll('.priority-btn');
+              const priority = existingSelection.priority;
+              const priorityButtons =
+                concertEl.querySelectorAll('.priority-btn');
               priorityButtons.forEach((btn) => {
-                const btnPriority = parseInt((btn as HTMLElement).dataset['priority'] || '0', 10);
-                btn.classList.remove('bg-indigo-500', 'text-white', 'btn-selected');
-                btn.classList.add('bg-white', 'text-indigo-700', 'dark:bg-gray-600', 'dark:text-gray-200');
+                const btnPriority = parseInt(
+                  (btn as HTMLElement).dataset['priority'] || '0',
+                  10
+                );
+                btn.classList.remove(
+                  'bg-indigo-500',
+                  'text-white',
+                  'btn-selected'
+                );
+                btn.classList.add(
+                  'bg-white',
+                  'text-indigo-700',
+                  'dark:bg-gray-600',
+                  'dark:text-gray-200'
+                );
                 if (btnPriority === priority) {
-                  btn.classList.remove('bg-white', 'text-indigo-700', 'dark:bg-gray-600', 'dark:text-gray-200');
-                  btn.classList.add('bg-indigo-500', 'text-white', 'btn-selected', 'dark:bg-indigo-600');
+                  btn.classList.remove(
+                    'bg-white',
+                    'text-indigo-700',
+                    'dark:bg-gray-600',
+                    'dark:text-gray-200'
+                  );
+                  btn.classList.add(
+                    'bg-indigo-500',
+                    'text-white',
+                    'btn-selected',
+                    'dark:bg-indigo-600'
+                  );
                 }
               });
             }
@@ -1374,16 +1483,22 @@ export class AppComponent implements OnInit {
 
     const updateItinerary = () => {
       if (userSelections.length === 0) {
-        if (itineraryListContainer) itineraryListContainer.innerHTML =
-          '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
+        if (itineraryListContainer)
+          itineraryListContainer.innerHTML =
+            '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
         if (clearPlanBtn) clearPlanBtn.classList.add('hidden');
         return;
       }
       if (clearPlanBtn) clearPlanBtn.classList.remove('hidden');
-      const winners = [...userSelections].filter((s: any) => winnerIds.has(s.id));
+      const winners = [...userSelections].filter((s: any) =>
+        winnerIds.has(s.id)
+      );
       const itineraryByDay: Record<string, any[]> = {};
       winners
-        .sort((a: any, b: any) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+        .sort(
+          (a: any, b: any) =>
+            timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+        )
         .forEach((winner: any) => {
           const day = winner.day;
           if (!itineraryByDay[day]) itineraryByDay[day] = [];
@@ -1391,10 +1506,15 @@ export class AppComponent implements OnInit {
           itineraryByDay[day].push({
             concert: winner,
             conflicts: userSelections
-              .filter((c: any) => c.id !== winner.id && checkConflict(c, winner))
+              .filter(
+                (c: any) => c.id !== winner.id && checkConflict(c, winner)
+              )
               .sort((a: any, b: any) => {
-                const timeCompare = timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
-                return timeCompare !== 0 ? timeCompare : a.priority - b.priority;
+                const timeCompare =
+                  timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+                return timeCompare !== 0
+                  ? timeCompare
+                  : a.priority - b.priority;
               }),
           });
         });
@@ -1420,24 +1540,30 @@ export class AppComponent implements OnInit {
       }
 
       Object.keys(itineraryByDay)
-        .sort((a, b) => ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a as string) - ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b as string))        .forEach((day) => {
+        .sort(
+          (a, b) =>
+            ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a as string) -
+            ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b as string)
+        )
+        .forEach((day) => {
           const dayHeader = document.createElement('h3');
-          dayHeader.className = 'itinerary-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
-          
+          dayHeader.className =
+            'itinerary-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
+
           // Determine day header state based on concerts in this day
-          const dayHasWinners = itineraryByDay[day].some((item: any) => 
+          const dayHasWinners = itineraryByDay[day].some((item: any) =>
             winnerIds.has(item.concert.id)
           );
-          const dayHasConflicts = itineraryByDay[day].some((item: any) => 
-            !winnerIds.has(item.concert.id)
+          const dayHasConflicts = itineraryByDay[day].some(
+            (item: any) => !winnerIds.has(item.concert.id)
           );
-          
+
           if (dayHasWinners && !dayHasConflicts) {
             dayHeader.classList.add('selected');
           } else if (dayHasConflicts) {
             dayHeader.classList.add('selected-conflict');
           }
-          
+
           dayHeader.textContent = day;
           itineraryListContainer.appendChild(dayHeader);
 
@@ -1490,7 +1616,11 @@ export class AppComponent implements OnInit {
         });
     };
 
-    const populateConflictList = (container: HTMLElement, conflicts: any[], mainConcertId: string) => {
+    const populateConflictList = (
+      container: HTMLElement,
+      conflicts: any[],
+      mainConcertId: string
+    ) => {
       if (!container) return;
       const removeIconSVG = `<i class="fa-solid fa-xmark"></i>`;
       container.innerHTML = '';
@@ -1517,7 +1647,9 @@ export class AppComponent implements OnInit {
 
     // --- Event Handlers ---
     const handleAddClick = (e: Event) => {
-      const button = (e.target as HTMLElement)?.closest('.add-btn') as HTMLElement | null;
+      const button = (e.target as HTMLElement)?.closest(
+        '.add-btn'
+      ) as HTMLElement | null;
       if (!button) return;
       const concertId = button.dataset ? button.dataset['id'] : undefined;
       if (!concertId) return;
@@ -1529,9 +1661,13 @@ export class AppComponent implements OnInit {
       if (existingSelectionIndex > -1) {
         userSelections.splice(existingSelectionIndex, 1);
       } else {
-        const concertElement = button.closest('.concert-item') as HTMLElement | null;
+        const concertElement = button.closest(
+          '.concert-item'
+        ) as HTMLElement | null;
         if (!concertElement) return;
-        const selectedPriorityBtn = concertElement.querySelector('.priority-btn.btn-selected') as HTMLElement | null;
+        const selectedPriorityBtn = concertElement.querySelector(
+          '.priority-btn.btn-selected'
+        ) as HTMLElement | null;
 
         // Add the concert with priority 1 as default (will be adjusted by recalculation)
         const newConcert = {
@@ -1542,11 +1678,11 @@ export class AppComponent implements OnInit {
 
         // If a priority button was manually selected, force that priority
         if (selectedPriorityBtn) {
-          const selectedPriority = selectedPriorityBtn && selectedPriorityBtn.dataset ? selectedPriorityBtn.dataset['priority'] : undefined;
-          const forcedPriority = parseInt(
-            selectedPriority as string,
-            10
-          );
+          const selectedPriority =
+            selectedPriorityBtn && selectedPriorityBtn.dataset
+              ? selectedPriorityBtn.dataset['priority']
+              : undefined;
+          const forcedPriority = parseInt(selectedPriority as string, 10);
 
           // Force the priority for the newly added concert
           recalculatePriorities({
@@ -1560,7 +1696,9 @@ export class AppComponent implements OnInit {
       refreshAll();
     }; // Recalculate priorities for all concerts based on conflicts
     let forcedPriorities: { [key: string]: any } = {};
-    const recalculatePriorities = (newForcedPriorities: { [key: string]: any } = {}) => {
+    const recalculatePriorities = (
+      newForcedPriorities: { [key: string]: any } = {}
+    ) => {
       forcedPriorities = newForcedPriorities;
 
       // Create a copy of the selections for processing
@@ -1641,16 +1779,29 @@ export class AppComponent implements OnInit {
     };
 
     const handlePriorityClick = (e: Event) => {
-      const button = (e.target as HTMLElement)?.closest('.priority-btn') as HTMLElement | null;
+      const button = (e.target as HTMLElement)?.closest(
+        '.priority-btn'
+      ) as HTMLElement | null;
       if (!button) return;
-      const concertElement = button.closest('.concert-item') as HTMLElement | null;
+      const concertElement = button.closest(
+        '.concert-item'
+      ) as HTMLElement | null;
       if (!concertElement) return;
-      const selectedPriorityBtn = concertElement.querySelector('.priority-btn.btn-selected') as HTMLElement | null;
-      const priorityGroup = button.closest('.priority-btn-group') as HTMLElement | null;
+      const selectedPriorityBtn = concertElement.querySelector(
+        '.priority-btn.btn-selected'
+      ) as HTMLElement | null;
+      const priorityGroup = button.closest(
+        '.priority-btn-group'
+      ) as HTMLElement | null;
       if (!priorityGroup) return;
-      const concertId = priorityGroup.dataset ? priorityGroup.dataset['id'] : undefined;
+      const concertId = priorityGroup.dataset
+        ? priorityGroup.dataset['id']
+        : undefined;
       if (!concertId) return;
-      const newPriority = button.dataset && button.dataset['priority'] ? parseInt(button.dataset['priority'], 10) : undefined;
+      const newPriority =
+        button.dataset && button.dataset['priority']
+          ? parseInt(button.dataset['priority'], 10)
+          : undefined;
       if (newPriority === undefined) return;
 
       const selectionIndex = userSelections.findIndex(
@@ -1667,8 +1818,11 @@ export class AppComponent implements OnInit {
         // Refresh the UI once with the updated priorities
         refreshAll();
       } else {
-        const allPriorityButtons = priorityGroup.querySelectorAll('.priority-btn');
-        allPriorityButtons.forEach((btn) => (btn as HTMLElement).classList.remove('btn-selected'));
+        const allPriorityButtons =
+          priorityGroup.querySelectorAll('.priority-btn');
+        allPriorityButtons.forEach((btn) =>
+          (btn as HTMLElement).classList.remove('btn-selected')
+        );
         button.classList.add('btn-selected');
         refreshAll();
       }
@@ -1686,26 +1840,41 @@ export class AppComponent implements OnInit {
 
     const handleItineraryClick = (e: Event) => {
       const target = e.target as HTMLElement | null;
-      const removeItemBtn = target?.closest('.remove-item-btn') as HTMLElement | null;
+      const removeItemBtn = target?.closest(
+        '.remove-item-btn'
+      ) as HTMLElement | null;
       if (removeItemBtn) {
         handleRemoveItem(removeItemBtn.getAttribute('data-id')!);
         return;
       }
-      const removeConflictBtn = target?.closest('.remove-conflict-btn') as HTMLElement | null;
+      const removeConflictBtn = target?.closest(
+        '.remove-conflict-btn'
+      ) as HTMLElement | null;
       if (removeConflictBtn) {
         handleRemoveItem(removeConflictBtn.getAttribute('data-id')!);
         return;
       }
-      const swapItem = target?.closest('.conflict-swap-item') as HTMLElement | null;
+      const swapItem = target?.closest(
+        '.conflict-swap-item'
+      ) as HTMLElement | null;
       if (swapItem) {
-        const mainId = swapItem.dataset ? swapItem.dataset['mainId'] : undefined;
-        const conflictId = swapItem.dataset ? swapItem.dataset['conflictId'] : undefined;
+        const mainId = swapItem.dataset
+          ? swapItem.dataset['mainId']
+          : undefined;
+        const conflictId = swapItem.dataset
+          ? swapItem.dataset['conflictId']
+          : undefined;
         if (!mainId || !conflictId) return;
-        const mainConcertIndex = userSelections.findIndex((c: any) => c.id === mainId);
-        const conflictConcertIndex = userSelections.findIndex((c: any) => c.id === conflictId);
+        const mainConcertIndex = userSelections.findIndex(
+          (c: any) => c.id === mainId
+        );
+        const conflictConcertIndex = userSelections.findIndex(
+          (c: any) => c.id === conflictId
+        );
         if (mainConcertIndex > -1 && conflictConcertIndex > -1) {
           const mainPriority = userSelections[mainConcertIndex].priority;
-          userSelections[mainConcertIndex].priority = userSelections[conflictConcertIndex].priority;
+          userSelections[mainConcertIndex].priority =
+            userSelections[conflictConcertIndex].priority;
           userSelections[conflictConcertIndex].priority = mainPriority;
           refreshAll();
         }
@@ -1718,11 +1887,21 @@ export class AppComponent implements OnInit {
       refreshAll();
     };
     const initializeFilters = () => {
-      const dayFilterContainer = document.getElementById('day-filters') as HTMLElement | null;
-      const stageFilterContainer = document.getElementById('stage-filters') as HTMLElement | null;
-      const priorityFilterContainer = document.getElementById('priority-filters') as HTMLElement | null;
-      const artistSearchInput = document.getElementById('artist-search') as HTMLInputElement | null;
-      const resetBtn = document.getElementById('reset-filters-btn') as HTMLElement | null;
+      const dayFilterContainer = document.getElementById(
+        'day-filters'
+      ) as HTMLElement | null;
+      const stageFilterContainer = document.getElementById(
+        'stage-filters'
+      ) as HTMLElement | null;
+      const priorityFilterContainer = document.getElementById(
+        'priority-filters'
+      ) as HTMLElement | null;
+      const artistSearchInput = document.getElementById(
+        'artist-search'
+      ) as HTMLInputElement | null;
+      const resetBtn = document.getElementById(
+        'reset-filters-btn'
+      ) as HTMLElement | null;
       const dayOrder = ['Thursday', 'Friday', 'Saturday', 'Sunday'];
       const uniqueDays = getUniqueValues('day').sort(
         (a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b)
@@ -1760,27 +1939,46 @@ export class AppComponent implements OnInit {
         notSelectedDiv.innerHTML = `<input id="priority-${notSelectedValue}" value="${notSelectedValue}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="priority-${notSelectedValue}" class="ml-2">Not selected</label>`;
         priorityFilterContainer.appendChild(notSelectedDiv);
       }
-      if (artistSearchInput) artistSearchInput.addEventListener('input', applyFiltersAndRender);
-      if (dayFilterContainer) dayFilterContainer.addEventListener('change', applyFiltersAndRender);
-      if (stageFilterContainer) stageFilterContainer.addEventListener('change', applyFiltersAndRender);
-      if (priorityFilterContainer) priorityFilterContainer.addEventListener('change', applyFiltersAndRender);
-      if (resetBtn) resetBtn.addEventListener('click', () => {
-        if (artistSearchInput) artistSearchInput.value = '';
-        document
-          .querySelectorAll<HTMLInputElement>('#filter-container input[type="checkbox"]')
-          .forEach((cb) => (cb.checked = false));
-        applyFiltersAndRender();
-      });
+      if (artistSearchInput)
+        artistSearchInput.addEventListener('input', applyFiltersAndRender);
+      if (dayFilterContainer)
+        dayFilterContainer.addEventListener('change', applyFiltersAndRender);
+      if (stageFilterContainer)
+        stageFilterContainer.addEventListener('change', applyFiltersAndRender);
+      if (priorityFilterContainer)
+        priorityFilterContainer.addEventListener(
+          'change',
+          applyFiltersAndRender
+        );
+      if (resetBtn)
+        resetBtn.addEventListener('click', () => {
+          if (artistSearchInput) artistSearchInput.value = '';
+          document
+            .querySelectorAll<HTMLInputElement>(
+              '#filter-container input[type="checkbox"]'
+            )
+            .forEach((cb) => (cb.checked = false));
+          applyFiltersAndRender();
+        });
       // Always show priority filter section and update styling
       const updatePriorityFilterVisibility = () => {
         if (!priorityFilterContainer) return;
-        const priorityFilterSection = priorityFilterContainer.closest('div.mt-4') as HTMLElement | null;
-        if (priorityFilterSection) priorityFilterSection.style.display = 'block';
+        const priorityFilterSection = priorityFilterContainer.closest(
+          'div.mt-4'
+        ) as HTMLElement | null;
+        if (priorityFilterSection)
+          priorityFilterSection.style.display = 'block';
         // Update the priority checkboxes to show counts
         priorities.forEach((priority) => {
-          const checkbox = document.getElementById(`priority-${priority}`) as HTMLInputElement | null;
-          const label = checkbox ? checkbox.nextElementSibling as HTMLElement | null : null;
-          const count = userSelections.filter((s: any) => s.priority === priority).length;
+          const checkbox = document.getElementById(
+            `priority-${priority}`
+          ) as HTMLInputElement | null;
+          const label = checkbox
+            ? (checkbox.nextElementSibling as HTMLElement | null)
+            : null;
+          const count = userSelections.filter(
+            (s: any) => s.priority === priority
+          ).length;
           if (label) {
             if (count > 0) {
               label.innerHTML = `P${priority} <span class="ml-1 px-2 py-0.5 text-xs bg-indigo-100 text-indigo-800 rounded-full">${count}</span>`;
@@ -1790,9 +1988,14 @@ export class AppComponent implements OnInit {
           }
         });
         // Update the "Not selected" checkbox to show count
-        const notSelectedCheckbox = document.getElementById(`priority-${notSelectedValue}`) as HTMLInputElement | null;
-        const notSelectedLabel = notSelectedCheckbox ? notSelectedCheckbox.nextElementSibling as HTMLElement | null : null;
-        const notSelectedCount = this.concertData.length - userSelections.length;
+        const notSelectedCheckbox = document.getElementById(
+          `priority-${notSelectedValue}`
+        ) as HTMLInputElement | null;
+        const notSelectedLabel = notSelectedCheckbox
+          ? (notSelectedCheckbox.nextElementSibling as HTMLElement | null)
+          : null;
+        const notSelectedCount =
+          this.concertData.length - userSelections.length;
         if (notSelectedLabel) {
           if (notSelectedCount > 0) {
             notSelectedLabel.innerHTML = `Not selected <span class="ml-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">${notSelectedCount}</span>`;
@@ -1804,8 +2007,14 @@ export class AppComponent implements OnInit {
       // Initial call to set visibility
       updatePriorityFilterVisibility();
       // Update visibility whenever selections change or after filter reset
-      document.addEventListener('selectionsUpdated', updatePriorityFilterVisibility);
-      if (resetBtn) resetBtn.addEventListener('click', () => setTimeout(updatePriorityFilterVisibility, 50));
+      document.addEventListener(
+        'selectionsUpdated',
+        updatePriorityFilterVisibility
+      );
+      if (resetBtn)
+        resetBtn.addEventListener('click', () =>
+          setTimeout(updatePriorityFilterVisibility, 50)
+        );
     };
 
     // --- Initialisation ---
@@ -1815,7 +2024,9 @@ export class AppComponent implements OnInit {
     refreshAll();
     // --- Event Listeners ---
     // Removed theme toggle event listener (now handled by Angular binding)
-    const concertListElement = document.getElementById('concert-list') as HTMLElement | null;
+    const concertListElement = document.getElementById(
+      'concert-list'
+    ) as HTMLElement | null;
     if (concertListElement) {
       concertListElement.addEventListener('click', (e: Event) => {
         const target = e.target as HTMLElement | null;
@@ -1826,7 +2037,8 @@ export class AppComponent implements OnInit {
         }
       });
     }
-    if (itineraryListContainer) itineraryListContainer.addEventListener('click', handleItineraryClick);
+    if (itineraryListContainer)
+      itineraryListContainer.addEventListener('click', handleItineraryClick);
     if (clearPlanBtn) clearPlanBtn.addEventListener('click', clearPlan);
   }
 }

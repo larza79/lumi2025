@@ -82,10 +82,11 @@ export class AppComponent implements OnInit {
     document.documentElement.classList.toggle('dark', this.isDarkMode);
     localStorage.setItem('theme', this.isDarkMode ? 'dark' : 'light');
   }
-
   checkScreenSize(): void {
     this.isMobile = window.innerWidth < 1024;
-    if (!this.isMobile) {
+    if (this.isMobile) {
+      this.showFilter = false;
+    } else {
       this.showFilter = true;
     }
   }

@@ -255,6 +255,9 @@
                         'hover:bg-indigo-600':
                           isConcertSelected(concert.id) &&
                           getConcertPriority(concert.id) === p,
+                        'bg-white':
+                          !isConcertSelected(concert.id) ||
+                          getConcertPriority(concert.id) !== p,
                         'border-gray-300':
                           !isConcertSelected(concert.id) ||
                           getConcertPriority(concert.id) !== p,
@@ -265,6 +268,12 @@
                           !isConcertSelected(concert.id) ||
                           getConcertPriority(concert.id) !== p,
                         'dark:hover:bg-gray-600':
+                          !isConcertSelected(concert.id) ||
+                          getConcertPriority(concert.id) !== p,
+                        'dark:bg-gray-800':
+                          !isConcertSelected(concert.id) ||
+                          getConcertPriority(concert.id) !== p,
+                        'dark:text-gray-300':
                           !isConcertSelected(concert.id) ||
                           getConcertPriority(concert.id) !== p
                       }"

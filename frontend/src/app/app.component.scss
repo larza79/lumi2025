@@ -4,6 +4,11 @@
   color: white;
 }
 
+/* Unselected priority buttons */
+.priority-btn {
+  background-color: #ffffff;
+}
+
 /* Right aligned controls for concert items on small screens */
 @media (max-width: 639px) {
   .concert-item {
@@ -14,7 +19,7 @@
   .concert-item .flex-grow {
     max-width: 65%;
   }
-  
+
   .concert-item .controls-container {
     display: flex;
     flex-direction: column-reverse;
@@ -22,7 +27,7 @@
     gap: 0.5rem;
     flex-shrink: 0;
   }
-  
+
   .concert-item .add-btn {
     margin-bottom: 0.25rem;
   }

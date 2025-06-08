@@ -4,6 +4,30 @@
   color: white;
 }
 
+/* Right aligned controls for concert items on small screens */
+@media (max-width: 639px) {
+  .concert-item {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .concert-item .flex-grow {
+    max-width: 65%;
+  }
+  
+  .concert-item .controls-container {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  
+  .concert-item .add-btn {
+    margin-bottom: 0.25rem;
+  }
+}
+
 .add-btn.added {
   background-color: #10b981;
   color: white;

@@ -1378,12 +1378,10 @@ export class AppComponent implements OnInit {
           }
 
           dayHeader.textContent = day;
-          concertListContainer.appendChild(dayHeader);
-
-          concertsByDay[day].forEach((concert: any) => {
+          concertListContainer.appendChild(dayHeader);          concertsByDay[day].forEach((concert: any) => {
             const concertEl = document.createElement('div');
             concertEl.className =
-              'concert-item flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50';
+              'concert-item flex flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50';
             const existingSelection = userSelections.find(
               (s) => s.id === concert.id
             );
@@ -1411,8 +1409,7 @@ export class AppComponent implements OnInit {
               ? 'add-btn added'
               : 'add-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-4 rounded-md';
 
-            concertEl.innerHTML = `
-                  <div class="flex-grow mb-2 sm:mb-0">
+            concertEl.innerHTML = `                  <div class="flex-grow">
                       <p class="font-semibold text-lg">${concert.artist}</p>
                       <p class="text-sm text-gray-600">${concert.startTime} - ${
               concert.endTime
@@ -1421,9 +1418,8 @@ export class AppComponent implements OnInit {
               concert.endTime
             )} mins)</p>                                <p class="text-sm text-indigo-500 font-medium">${
               concert.stage
-            }</p>
-                  </div>
-                  <div class="flex items-center space-x-2">
+            }</p>                  </div>
+                  <div class="flex items-center space-x-2 controls-container">
                       <div class="priority-btn-group flex" data-id="${
                         concert.id
                       }">

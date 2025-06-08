@@ -510,6 +510,19 @@ export class AppComponent implements OnInit {
     );
   }
 
+  // Added methods for the badge counts
+  getSelectedConcertsCount(): number {
+    return this.userSelections.length;
+  }
+
+  getWinnerConcertsCount(): number {
+    return this.winnerIds.size;
+  }
+
+  getConflictConcertsCount(): number {
+    return this.userSelections.length - this.winnerIds.size;
+  }
+
   toggleDayFilter(day: string): void {
     if (this.selectedDays.includes(day)) {
       this.selectedDays = this.selectedDays.filter((d) => d !== day);

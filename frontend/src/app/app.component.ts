@@ -6,20 +6,59 @@ import {
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import {
+  Concert,
+  ConcertSelection,
+  ConflictItem,
+} from './models/concert.model';
+import { concertData as festivalData } from './data/concert-data';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, CommonModule],
+  imports: [RouterOutlet, CommonModule, FormsModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
   encapsulation: ViewEncapsulation.None,
   standalone: true,
 })
 export class AppComponent implements OnInit {
-  concertData: any[] = [];
+  // UI State
   activeTab: 'concerts' | 'itinerary' = 'concerts';
   isMobile = false;
-  showFilter = false; // Hide filter by default on mobile
+  showFilter = true;
+  isDarkMode = false;
+  // Concert Data
+  concertData: Concert[] = [];
+  userSelections: ConcertSelection[] = [];
+  winnerIds = new Set<string>();
+  filteredConcerts: Concert[] = [];
+  lastSwappedId: string | null = null; // Track the last swapped concert ID
+
+  // Organized Collections
+  concertsByDay: { [key: string]: Concert[] } = {};
+  itineraryByDay: { [key: string]: ConflictItem[] } = {};
+  uniqueDays: string[] = [];
+  uniqueStages: string[] = [];
+
+  // Filter State
+  artistSearch = '';
+  selectedDays: string[] = [];
+  selectedStages: string[] = [];
+  selectedPriorities: number[] = [];
+  isNotSelectedChecked = false;
+
+  // UI Helpers
+  showClearPlanBtn = false;
+
+  // Constants
+  readonly dayOrder = ['Thursday', 'Friday', 'Saturday', 'Sunday'];
+  readonly priorities = [1, 2, 3];
+  readonly notSelectedValue = 'not-selected';
+
+  // Priority counts
+  priorityCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0 };
+  notSelectedCount = 0;
 
   @HostListener('window:resize', ['$event'])
   onResize() {
@@ -28,2013 +67,474 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.initData();
-    this.initApp();
+    this.loadSelections();
     this.checkScreenSize();
-
-    // Ensure theme is set correctly on load
-    const htmlEl = document.documentElement;
-    const lightIcon = document.getElementById(
-      'theme-icon-light'
-    ) as HTMLElement | null;
-    const darkIcon = document.getElementById(
-      'theme-icon-dark'
-    ) as HTMLElement | null;
-    const initialTheme =
-      localStorage.getItem('theme') ||
-      (window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light');
-    htmlEl.classList.toggle('dark', initialTheme === 'dark');
-    if (darkIcon) darkIcon.classList.toggle('hidden', initialTheme !== 'dark');
-    if (lightIcon)
-      lightIcon.classList.toggle('hidden', initialTheme === 'dark');
+    this.initTheme();
+    this.refreshAll();
   }
 
-  checkScreenSize() {
-    const wasMobile = this.isMobile;
-    this.isMobile = window.innerWidth < 1024;
-
-    // Always show filter on desktop
-    if (!this.isMobile && wasMobile) {
-      this.showFilter = true;
-    }
-
-    // Hide filter by default when switching to mobile
-    if (this.isMobile && !wasMobile) {
-      this.showFilter = false;
-    }
-  }
-
-  toggleFilter() {
+  toggleFilter(): void {
     this.showFilter = !this.showFilter;
   }
 
   onThemeToggle(): void {
-    const htmlEl = document.documentElement;
-    const lightIcon = document.getElementById(
-      'theme-icon-light'
-    ) as HTMLElement | null;
-    const darkIcon = document.getElementById(
-      'theme-icon-dark'
-    ) as HTMLElement | null;
-    const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
-    localStorage.setItem('theme', newTheme);
-    htmlEl.classList.toggle('dark', newTheme === 'dark');
-    if (darkIcon) darkIcon.classList.toggle('hidden', newTheme !== 'dark');
-    if (lightIcon) lightIcon.classList.toggle('hidden', newTheme === 'dark');
+    this.isDarkMode = !this.isDarkMode;
+    document.documentElement.classList.toggle('dark', this.isDarkMode);
+    localStorage.setItem('theme', this.isDarkMode ? 'dark' : 'light');
+  }
+
+  checkScreenSize(): void {
+    this.isMobile = window.innerWidth < 1024;
+    if (!this.isMobile) {
+      this.showFilter = true;
+    }
+  }
+  initTheme(): void {
+    const savedTheme = localStorage.getItem('theme');
+    this.isDarkMode =
+      savedTheme === 'dark' ||
+      (!savedTheme &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', this.isDarkMode);
   }
 
   private initData(): void {
-    const concertData = [
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'Spark & Shade',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '13:00',
-        endTime: '14:00',
-        artist: 'Sønin',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '14:00',
-        endTime: '15:00',
-        artist: 'Nitrous Oxide',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '15:00',
-        endTime: '16:00',
-        artist: "Simon O'Shine",
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '16:00',
-        endTime: '17:00',
-        artist: 'Asteroid',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '17:00',
-        endTime: '18:00',
-        artist: 'Paul Denton',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '18:00',
-        endTime: '19:15',
-        artist: 'Jordan Suckley',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '19:15',
-        endTime: '20:30',
-        artist: 'Alti',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '20:30',
-        endTime: '21:45',
-        artist: 'Gareth Emery (Hard Set)',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Mainstage Beach',
-        startTime: '21:45',
-        endTime: '23:00',
-        artist: 'Mark Sherry',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '12:00',
-        endTime: '13:15',
-        artist: 'Sinful Biz',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '13:15',
-        endTime: '14:30',
-        artist: 'Darren Tate',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '14:30',
-        endTime: '15:45',
-        artist: 'Ronski Speed',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '15:45',
-        endTime: '17:00',
-        artist: 'Kyau & Albert',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '17:00',
-        endTime: '18:00',
-        artist: 'Genix',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '18:00',
-        endTime: '19:00',
-        artist: 'Liam Wilson',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '19:00',
-        endTime: '20:00',
-        artist: 'Artento Divini',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '20:00',
-        endTime: '21:00',
-        artist: 'Allen Watts',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '21:00',
-        endTime: '22:00',
-        artist: 'Metta & Glyde',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Sunset Beach',
-        startTime: '22:00',
-        endTime: '23:00',
-        artist: 'Sam Jones',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '13:00',
-        endTime: '14:30',
-        artist: 'Temple One',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '14:30',
-        endTime: '15:45',
-        artist: 'Andrea Ribeca',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '15:45',
-        endTime: '17:00',
-        artist: 'Daniel Kandi',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '17:00',
-        endTime: '18:15',
-        artist: 'Steve Allen',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '18:15',
-        endTime: '19:30',
-        artist: 'Ahmed Romel',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '19:30',
-        endTime: '20:45',
-        artist: 'Ferry Tayle & Tonks Pres. Mirage (Vinyl Set)',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '20:45',
-        endTime: '22:00',
-        artist: 'Cold Blue',
-      },
-      {
-        day: 'Thursday',
-        date: '2025-06-26',
-        stage: 'Beachclub Bernies',
-        startTime: '22:00',
-        endTime: '23:00',
-        artist: 'Signum',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'Dylhen',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '13:00',
-        endTime: '14:00',
-        artist: 'Leena Punks',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '14:00',
-        endTime: '15:00',
-        artist: 'Push',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '15:00',
-        endTime: '16:00',
-        artist: 'Kai Tracid',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '16:00',
-        endTime: '17:00',
-        artist: 'Amber Broos',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '17:00',
-        endTime: '18:00',
-        artist: 'Billy Gillies',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '18:00',
-        endTime: '19:15',
-        artist: 'Space 92',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '19:15',
-        endTime: '20:30',
-        artist: 'Vini Vici',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '20:30',
-        endTime: '21:45',
-        artist: 'Ben Nicky Pres. Emotional Havoc',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Mainstage Beach',
-        startTime: '21:45',
-        endTime: '23:00',
-        artist: 'Maddix',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'Simon Gregory',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '13:00',
-        endTime: '14:30',
-        artist: 'Paul Skelton',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '14:00',
-        endTime: '15:00',
-        artist: 'Factoria',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '15:00',
-        endTime: '18:00',
-        artist: 'Andy Moor (Producer Set)',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '16:00',
-        endTime: '17:00',
-        artist: 'Paul Webster',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '17:00',
-        endTime: '18:00',
-        artist: 'Sander van Doorn',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '18:00',
-        endTime: '19:00',
-        artist: 'Will Rees',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '19:00',
-        endTime: '20:00',
-        artist: 'Greg Downey',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '20:00',
-        endTime: '21:00',
-        artist: 'Sean Tyas',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Sunset Beach',
-        startTime: '21:00',
-        endTime: '23:00',
-        artist: 'John Askew B2B Simon Patterson',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'Claus Backslash',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '13:00',
-        endTime: '14:00',
-        artist: 'Ralphie B & Frank Waanders Pres. Collide1',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '14:00',
-        endTime: '15:00',
-        artist: 'Dimension',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '15:00',
-        endTime: '16:00',
-        artist: 'Misja Helsloot',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '16:00',
-        endTime: '17:00',
-        artist: 'Stoneface & Terminal',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '17:00',
-        endTime: '18:15',
-        artist: 'Johan Gielen',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '18:15',
-        endTime: '19:30',
-        artist: 'Maria Healy',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '19:30',
-        endTime: '20:45',
-        artist: 'Richard Durand',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '20:45',
-        endTime: '22:00',
-        artist: 'Snejder',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'Beachclub Bernies',
-        startTime: '22:00',
-        endTime: '23:00',
-        artist: 'RAM',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '13:00',
-        endTime: '14:15',
-        artist: 'Fuenka',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '14:15',
-        endTime: '15:30',
-        artist: 'Digital Drift',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '15:30',
-        endTime: '16:45',
-        artist: '45C-Systems',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '16:45',
-        endTime: '18:00',
-        artist: 'Darren Porter',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '18:00',
-        endTime: '19:15',
-        artist: 'Adam Ellis',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '19:15',
-        endTime: '20:30',
-        artist: 'Kinetica',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '20:30',
-        endTime: '21:45',
-        artist: 'Toyax',
-      },
-      {
-        day: 'Friday',
-        date: '2025-06-27',
-        stage: 'This Is Trance!',
-        startTime: '21:45',
-        endTime: '23:00',
-        artist: 'Edele Andaya',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '12:00',
-        endTime: '13:15',
-        artist: 'Miromar',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '13:15',
-        endTime: '14:30',
-        artist: 'Estiva',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '14:30',
-        endTime: '15:45',
-        artist: 'Dosem',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '15:45',
-        endTime: '17:00',
-        artist: 'Daxson',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '17:00',
-        endTime: '18:30',
-        artist: 'Markus Schulz',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '18:30',
-        endTime: '20:00',
-        artist: "John O'callaghan",
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '20:00',
-        endTime: '21:30',
-        artist: 'Paul van Dyk',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Mainstage Beach',
-        startTime: '21:30',
-        endTime: '23:00',
-        artist: 'Bryan Kearney',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'The Blizzard',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '13:00',
-        endTime: '14:15',
-        artist: 'Trance Wax',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '14:15',
-        endTime: '15:30',
-        artist: 'Push',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '16:45',
-        endTime: '18:00',
-        artist: 'Gabriel & Dresden',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '16:45',
-        endTime: '18:00',
-        artist: 'Ruben de Ronde Pres. NRG2000',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '16:45',
-        endTime: '18:00',
-        artist: 'Superstrings',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '19:10',
-        endTime: '20:20',
-        artist: 'Sander van Doorn',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '20:20',
-        endTime: '21:30',
-        artist: 'Marcov',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Sunset Beach',
-        startTime: '21:30',
-        endTime: '23:00',
-        artist: 'Scot Project & Jordan Suckley',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '12:00',
-        endTime: '13:15',
-        artist: 'Talee',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '13:15',
-        endTime: '14:30',
-        artist: 'Modea',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '14:30',
-        endTime: '15:45',
-        artist: 'Corren Cavini',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '15:45',
-        endTime: '17:00',
-        artist: 'BLR',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '17:00',
-        endTime: '19:00',
-        artist: 'Paul Oakenfold',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '19:00',
-        endTime: '20:20',
-        artist: 'John 00 Fleming',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '20:20',
-        endTime: '21:40',
-        artist: 'David Forbes',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'Beachclub Bernies',
-        startTime: '21:40',
-        endTime: '23:00',
-        artist: 'Mark Sherry Pres. Dark Sherry',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '12:00',
-        endTime: '13:30',
-        artist: 'Odette Hayas',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '13:30',
-        endTime: '15:00',
-        artist: 'Sunny Lax',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '15:00',
-        endTime: '16:20',
-        artist: 'The Blizzard',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '16:20',
-        endTime: '17:40',
-        artist: 'Daniel Skyver',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '17:40',
-        endTime: '19:00',
-        artist: 'Aeon Shift',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '19:00',
-        endTime: '20:20',
-        artist: 'DNA',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '20:20',
-        endTime: '21:40',
-        artist: 'Brendan Bartels',
-      },
-      {
-        day: 'Saturday',
-        date: '2025-06-28',
-        stage: 'This Is Trance!',
-        startTime: '21:40',
-        endTime: '23:00',
-        artist: 'Renegade System',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '12:00',
-        endTime: '13:15',
-        artist: 'Alex Wright',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '13:15',
-        endTime: '14:30',
-        artist: 'Orkidea',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '14:30',
-        endTime: '15:45',
-        artist: 'The Thrillseekers',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '15:45',
-        endTime: '17:00',
-        artist: 'Craig Connelly',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '17:00',
-        endTime: '18:15',
-        artist: 'Ben Gold',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '18:15',
-        endTime: '19:45',
-        artist: 'Giuseppe Ottaviani B2B Nifra',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '19:45',
-        endTime: '21:15',
-        artist: 'Aly & Fila',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Mainstage Beach',
-        startTime: '21:15',
-        endTime: '23:00',
-        artist: 'Ferry Corsten',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'Jamie Walker',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '13:00',
-        endTime: '14:00',
-        artist: 'Tyler Jack',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '14:00',
-        endTime: '15:00',
-        artist: 'Symmetrik',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '15:00',
-        endTime: '16:00',
-        artist: 'Shugz',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '16:00',
-        endTime: '17:00',
-        artist: 'Ve/Ra',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '17:00',
-        endTime: '18:20',
-        artist: 'Mauro Picotto',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '18:20',
-        endTime: '19:40',
-        artist: 'Will Atkinson',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '19:40',
-        endTime: '21:00',
-        artist: 'Hannah Laing',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '21:00',
-        endTime: '22:00',
-        artist: 'The Rocketman',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Sunset Ravers',
-        startTime: '22:00',
-        endTime: '23:00',
-        artist: 'John Askew (Nothing But Rockets Set)',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'Daniel Skyver (Progressive Classics)',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '12:00',
-        endTime: '13:00',
-        artist: 'Sam Mitcham (Vinyl Set)',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '14:00',
-        endTime: '15:00',
-        artist: 'Ben Lost',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '15:00',
-        endTime: '16:00',
-        artist: 'Oliver Lieb',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '16:00',
-        endTime: '17:00',
-        artist: 'Mr Sam',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '17:00',
-        endTime: '18:00',
-        artist: 'Matt Darey',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '18:00',
-        endTime: '19:00',
-        artist: 'The Space Brothers',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '19:00',
-        endTime: '20:00',
-        artist: 'Judge Jules',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '20:00',
-        endTime: '21:00',
-        artist: 'Fred Baker',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '21:00',
-        endTime: '22:00',
-        artist: 'DJ Quicksilver',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'Beachclub Bernies',
-        startTime: '22:00',
-        endTime: '23:00',
-        artist: 'Factor B (Back To The Future Set)',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '13:00',
-        endTime: '14:15',
-        artist: 'Maywave',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '14:15',
-        endTime: '15:30',
-        artist: 'Peter Steele',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '15:30',
-        endTime: '16:45',
-        artist: 'Doppenberg',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '16:45',
-        endTime: '18:00',
-        artist: 'Enigma State',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '18:00',
-        endTime: '19:15',
-        artist: 'Ogravity',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '19:15',
-        endTime: '20:30',
-        artist: 'Tasso',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '20:30',
-        endTime: '21:45',
-        artist: 'Matt Bukovski',
-      },
-      {
-        day: 'Sunday',
-        date: '2025-06-29',
-        stage: 'This Is Trance!',
-        startTime: '21:45',
-        endTime: '23:00',
-        artist: 'Νιkolauss',
-      },
-    ];
-
-    this.concertData = concertData.map((concert, index) => {
-      let stage = concert.stage;
-
+    // Use the imported concert data from data/concert-data.ts
+    this.concertData = festivalData.map((concert, index) => {
       return {
         ...concert,
-        id: `concert-${index}`, // Assign a stable, unique ID
-        stage: stage,
-      };
+        id: `concert-${index}`,
+      } as Concert;
     });
+
+    this.uniqueDays = this.getUniqueValues('day').sort(
+      (a, b) => this.dayOrder.indexOf(a) - this.dayOrder.indexOf(b)
+    );
+    this.uniqueStages = this.getUniqueValues('stage');
+    this.notSelectedCount = this.concertData.length;
+  }
+  private getUniqueValues(key: string): string[] {
+    return [
+      ...new Set(this.concertData.map((item) => String(item[key]))),
+    ].sort();
   }
 
-  private initApp(): void {
-    // --- Elements ---
-    const concertListContainer = document.getElementById(
-      'concert-list'
-    ) as HTMLElement | null;
-    const itineraryListContainer = document.getElementById(
-      'itinerary-list'
-    ) as HTMLElement | null;
-    const clearPlanBtn = document.getElementById(
-      'clear-plan-btn'
-    ) as HTMLElement | null;
-    // Removed themeToggleBtn, lightIcon, darkIcon, htmlEl, and theme event logic (now handled by Angular binding)
-    let userSelections: any[] = [];
-    let winnerIds = new Set<string>();
+  private timeToMinutes(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
 
-    // --- LocalStorage ---
-    const saveSelections = () => {
-      localStorage.setItem(
-        'festivalPlannerSelections',
-        JSON.stringify(userSelections)
+  getDuration(start: string, end: string): number {
+    return this.timeToMinutes(end) - this.timeToMinutes(start);
+  }
+  private checkConflict(
+    concertA: Concert | ConcertSelection,
+    concertB: Concert | ConcertSelection
+  ): boolean {
+    if (concertA.day !== concertB.day) return false;
+    const startA = this.timeToMinutes(concertA.startTime);
+    const endA = this.timeToMinutes(concertA.endTime);
+    const startB = this.timeToMinutes(concertB.startTime);
+    const endB = this.timeToMinutes(concertB.endTime);
+    const overlap = Math.max(
+      0,
+      Math.min(endA, endB) - Math.max(startA, startB)
+    );
+    return overlap > 15;
+  }
+
+  refreshAll(): void {
+    this.updateWinners();
+    this.applyFiltersAndRender();
+    this.updateItinerary();
+    this.saveSelections();
+    this.updatePriorityCounts();
+  }
+
+  private saveSelections(): void {
+    localStorage.setItem(
+      'festivalPlannerSelections',
+      JSON.stringify(this.userSelections)
+    );
+  }
+
+  private loadSelections(): void {
+    const savedData = localStorage.getItem('festivalPlannerSelections');
+    if (savedData) this.userSelections = JSON.parse(savedData);
+  }
+
+  private updateWinners(): void {
+    // If there's a recently swapped conflict, make sure it becomes a winner
+    if (this.lastSwappedId) {
+      // Find all conflicting concerts with the swapped concert
+      const swappedConcert = this.userSelections.find(
+        (c) => c.id === this.lastSwappedId
       );
-      document.dispatchEvent(new CustomEvent('selectionsUpdated'));
-    };
-    const loadSelections = () => {
-      const savedData = localStorage.getItem('festivalPlannerSelections');
-      if (savedData) userSelections = JSON.parse(savedData);
-    };
-
-    // --- Helpers ---
-    const timeToMinutes = (time: string): number => {
-      const [hours, minutes] = time.split(':').map(Number);
-      return hours * 60 + minutes;
-    };
-    const getDuration = (start: string, end: string): number => {
-      return timeToMinutes(end) - timeToMinutes(start);
-    };
-    const checkConflict = (concertA: any, concertB: any): boolean => {
-      if (concertA.day !== concertB.day) return false;
-      const startA = timeToMinutes(concertA.startTime);
-      const endA = timeToMinutes(concertA.endTime);
-      const startB = timeToMinutes(concertB.startTime);
-      const endB = timeToMinutes(concertB.endTime);
-      const overlap = Math.max(
-        0,
-        Math.min(endA, endB) - Math.max(startA, startB)
-      );
-      return overlap > 15;
-    };
-
-    // --- Main UI Refresh Logic ---
-    const refreshAll = () => {
-      updateWinners();
-      applyFiltersAndRender();
-      updateItinerary();
-      saveSelections();
-    };
-
-    // --- Data Processing & Filtering ---
-    const notSelectedValue = 'not-selected';
-    const updateWinners = () => {
-      const sortedSelections = [...userSelections].sort((a: any, b: any) => {
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
-      });
-
-      const winners: any[] = [];
-      sortedSelections.forEach((concert: any) => {
-        if (!winners.some((winner: any) => checkConflict(concert, winner))) {
-          winners.push(concert);
-        }
-      });
-      winnerIds = new Set<string>(winners.map((w: any) => w.id));
-    };
-
-    const getUniqueValues = (key: string): string[] =>
-      [...new Set(this.concertData.map((item: any) => item[key]))].sort();
-    const applyFiltersAndRender = () => {
-      const artistSearchInput = document.getElementById(
-        'artist-search'
-      ) as HTMLInputElement | null;
-      const artistSearch = artistSearchInput
-        ? artistSearchInput.value.toLowerCase()
-        : '';
-      const selectedDays = Array.from(
-        document.querySelectorAll<HTMLInputElement>(
-          '#day-filters input:checked'
-        )
-      ).map((el) => el.value);
-      const selectedStages = Array.from(
-        document.querySelectorAll<HTMLInputElement>(
-          '#stage-filters input:checked'
-        )
-      ).map((el) => el.value);
-      const selectedPriorityInputs = Array.from(
-        document.querySelectorAll<HTMLInputElement>(
-          '#priority-filters input:checked'
-        )
-      );
-
-      // Separate numeric priorities from "not-selected" special case
-      const selectedPriorities = selectedPriorityInputs
-        .filter((el) => el.value !== notSelectedValue)
-        .map((el) => parseInt(el.value, 10));
-
-      const isNotSelectedChecked = selectedPriorityInputs.some(
-        (el) => el.value === notSelectedValue
-      );
-
-      const filteredConcerts = this.concertData.filter((concert) => {
-        const artistMatch = concert.artist.toLowerCase().includes(artistSearch);
-        const dayMatch =
-          selectedDays.length === 0 || selectedDays.includes(concert.day);
-        const stageMatch =
-          selectedStages.length === 0 || selectedStages.includes(concert.stage);
-
-        // Check if this concert is in userSelections
-        const existingSelection = userSelections.find(
-          (s) => s.id === concert.id
-        );
-        const isSelected = !!existingSelection;
-
-        // For priority, handle both numeric priorities and the "not selected" case
-        let priorityMatch = selectedPriorityInputs.length === 0; // If no filters selected, match all
-
-        if (!priorityMatch) {
-          if (isNotSelectedChecked && !isSelected) {
-            // If "Not selected" is checked and this concert isn't selected, it's a match
-            priorityMatch = true;
-          } else if (selectedPriorities.length > 0 && isSelected) {
-            // If numeric priorities are selected and this concert has one of those priorities
-            priorityMatch = selectedPriorities.includes(
-              existingSelection.priority
-            );
-          }
-        }
-
-        return artistMatch && dayMatch && stageMatch && priorityMatch;
-
-        return artistMatch && dayMatch && stageMatch && priorityMatch;
-      });
-
-      renderFilteredConcerts(filteredConcerts);
-    };
-
-    // --- Render Functions ---
-    const renderFilteredConcerts = (concertsToRender: any[]) => {
-      if (!concertListContainer) return;
-      concertListContainer.innerHTML = '';
-      if (concertsToRender.length === 0) {
-        concertListContainer.innerHTML = `<p class="text-center text-gray-500 mt-8">No concerts match your filters.</p>`;
-        return;
-      }
-      const concertsByDay = concertsToRender.reduce(
-        (acc: Record<string, any[]>, concert: any) => {
-          if (!acc[concert.day]) acc[concert.day] = [];
-          acc[concert.day].push(concert);
-          return acc;
-        },
-        {}
-      );
-
-      Object.keys(concertsByDay)
-        .sort(
-          (a, b) =>
-            ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a) -
-            ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b)
-        )
-        .forEach((day) => {
-          const dayHeader = document.createElement('h3');
-          dayHeader.className =
-            'concert-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
-
-          // Determine day header state based on concerts in this day
-          const dayHasSelected = concertsByDay[day].some(
-            (concert: any) =>
-              userSelections.find((s) => s.id === concert.id) &&
-              winnerIds.has(concert.id)
-          );
-          const dayHasConflicts = concertsByDay[day].some(
-            (concert: any) =>
-              userSelections.find((s) => s.id === concert.id) &&
-              !winnerIds.has(concert.id)
-          );
-
-          if (dayHasSelected && !dayHasConflicts) {
-            dayHeader.classList.add('selected');
-          } else if (dayHasConflicts) {
-            dayHeader.classList.add('selected-conflict');
-          }
-
-          dayHeader.textContent = day;
-          concertListContainer.appendChild(dayHeader);          concertsByDay[day].forEach((concert: any) => {
-            const concertEl = document.createElement('div');
-            concertEl.className =
-              'concert-item flex flex-row justify-between items-start sm:items-center p-3 border-b hover:bg-gray-50';
-            const existingSelection = userSelections.find(
-              (s) => s.id === concert.id
-            );
-            const isAdded = !!existingSelection;
-
-            concertEl.classList.remove(
-              'selected',
-              'selected-conflict',
-              'bg-green-100',
-              'bg-yellow-100'
-            );
-            if (isAdded) {
-              if (winnerIds.has(concert.id)) {
-                concertEl.classList.add('selected', 'bg-green-100');
-              } else {
-                concertEl.classList.add('selected-conflict', 'bg-yellow-100');
-              }
-            }
-
-            // Ensure checkMarkSVG is defined before use
-            const checkMarkSVG =
-              '<svg class="inline w-4 h-4 mr-1 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>';
-            const buttonContent = isAdded ? checkMarkSVG : 'Add';
-            const buttonClasses = isAdded
-              ? 'add-btn added'
-              : 'add-btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1 px-4 rounded-md';
-
-            concertEl.innerHTML = `                  <div class="flex-grow">
-                      <p class="font-semibold text-lg">${concert.artist}</p>
-                      <p class="text-sm text-gray-600">${concert.startTime} - ${
-              concert.endTime
-            } (${getDuration(
-              concert.startTime,
-              concert.endTime
-            )} mins)</p>                                <p class="text-sm text-indigo-500 font-medium">${
-              concert.stage
-            }</p>                  </div>
-                  <div class="flex items-center space-x-2 controls-container">
-                      <div class="priority-btn-group flex" data-id="${
-                        concert.id
-                      }">
-                          <button class="priority-btn text-xs font-semibold py-1 px-3 rounded-l-md border border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="1">P1</button><button class="priority-btn text-xs font-semibold py-1 px-3 border-t border-b border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="2">P2</button><button class="priority-btn text-xs font-semibold py-1 px-3 rounded-r-md border border-gray-300 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200" data-priority="3">P3</button>
-                      </div>
-                      <button class="${buttonClasses}" data-id="${
-              concert.id
-            }">${buttonContent}</button>
-                  </div>`;
-            // Highlight the selected priority pill with bg-indigo-500 text-white
-            if (isAdded) {
-              const priority = existingSelection.priority;
-              const priorityButtons =
-                concertEl.querySelectorAll('.priority-btn');
-              priorityButtons.forEach((btn) => {
-                const btnPriority = parseInt(
-                  (btn as HTMLElement).dataset['priority'] || '0',
-                  10
-                );
-                btn.classList.remove(
-                  'bg-indigo-500',
-                  'text-white',
-                  'btn-selected'
-                );
-                btn.classList.add(
-                  'bg-white',
-                  'text-indigo-700',
-                  'dark:bg-gray-600',
-                  'dark:text-gray-200'
-                );
-                if (btnPriority === priority) {
-                  btn.classList.remove(
-                    'bg-white',
-                    'text-indigo-700',
-                    'dark:bg-gray-600',
-                    'dark:text-gray-200'
-                  );
-                  btn.classList.add(
-                    'bg-indigo-500',
-                    'text-white',
-                    'btn-selected',
-                    'dark:bg-indigo-600'
-                  );
-                }
-              });
-            }
-            concertListContainer.appendChild(concertEl);
-            if (isAdded) {
-              const priorityButton = concertEl.querySelector(
-                `.priority-btn[data-priority="${existingSelection.priority}"]`
-              );
-              if (priorityButton) priorityButton.classList.add('btn-selected');
-            }
-          });
-        });
-    };
-
-    const updateItinerary = () => {
-      if (userSelections.length === 0) {
-        if (itineraryListContainer)
-          itineraryListContainer.innerHTML =
-            '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
-        if (clearPlanBtn) clearPlanBtn.classList.add('hidden');
-        return;
-      }
-      if (clearPlanBtn) clearPlanBtn.classList.remove('hidden');
-      const winners = [...userSelections].filter((s: any) =>
-        winnerIds.has(s.id)
-      );
-      const itineraryByDay: Record<string, any[]> = {};
-      winners
-        .sort(
-          (a: any, b: any) =>
-            timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
-        )
-        .forEach((winner: any) => {
-          const day = winner.day;
-          if (!itineraryByDay[day]) itineraryByDay[day] = [];
-          // Get conflicts and sort them by start time first, then by priority
-          itineraryByDay[day].push({
-            concert: winner,
-            conflicts: userSelections
-              .filter(
-                (c: any) => c.id !== winner.id && checkConflict(c, winner)
-              )
-              .sort((a: any, b: any) => {
-                const timeCompare =
-                  timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
-                return timeCompare !== 0
-                  ? timeCompare
-                  : a.priority - b.priority;
-              }),
-          });
-        });
-      renderItineraryUI(itineraryByDay);
-    };
-
-    const renderItineraryUI = (itineraryByDay: Record<string, any[]>) => {
-      if (!itineraryListContainer) return;
-      itineraryListContainer.innerHTML = '';
-      const removeIconSVG = `<i class="fa-solid fa-xmark"></i>`;
-
-      if (
-        Object.keys(itineraryByDay).length === 0 &&
-        userSelections.length > 0
-      ) {
-        itineraryListContainer.innerHTML =
-          '<p class="text-gray-500 font-semibold">All your selections might have conflicts. Try changing priorities.</p>';
-        return;
-      } else if (userSelections.length === 0) {
-        itineraryListContainer.innerHTML =
-          '<p class="text-gray-500">Your planned concerts will appear here. Add concerts from the left to get started!</p>';
-        return;
-      }
-
-      Object.keys(itineraryByDay)
-        .sort(
-          (a, b) =>
-            ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(a as string) -
-            ['Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(b as string)
-        )
-        .forEach((day) => {
-          const dayHeader = document.createElement('h3');
-          dayHeader.className =
-            'itinerary-day-header text-lg font-bold mt-4 mb-2 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 p-2 rounded-md';
-
-          // Determine day header state based on concerts in this day
-          const dayHasWinners = itineraryByDay[day].some((item: any) =>
-            winnerIds.has(item.concert.id)
-          );
-          const dayHasConflicts = itineraryByDay[day].some(
-            (item: any) => !winnerIds.has(item.concert.id)
-          );
-
-          if (dayHasWinners && !dayHasConflicts) {
-            dayHeader.classList.add('selected');
-          } else if (dayHasConflicts) {
-            dayHeader.classList.add('selected-conflict');
-          }
-
-          dayHeader.textContent = day;
-          itineraryListContainer.appendChild(dayHeader);
-
-          itineraryByDay[day].forEach((item: any) => {
-            const { concert, conflicts } = item;
-            const itemEl = document.createElement('div');
-            itemEl.className = 'itinerary-item mb-2';
-
-            itemEl.innerHTML = `
-                            <div class="p-3 bg-green-100 border-l-4 border-green-500 rounded-r-lg">
-                                <div class="flex justify-between items-start">
-                                    <div class="concert-swap-item cursor-pointer flex-grow" data-main-id="${
-                                      concert.id
-                                    }" data-conflict-id="${concert.id}">
-                                        <p class="font-bold text-green-800">${
-                                          concert.artist
-                                        } (P${concert.priority})</p>
-                                        <p class="text-sm text-green-700">${
-                                          concert.startTime
-                                        } - ${concert.endTime} (${getDuration(
-              concert.startTime,
-              concert.endTime
-            )} mins)</p>                                        <p class="text-sm text-green-700 font-medium">@ ${
-              concert.stage
-            }</p>
-                                    </div>
-                                    <button title="Remove concert" class="remove-item-btn p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-100 dark:text-gray-500 dark:hover:text-red-400 dark:hover:bg-gray-700" data-id="${
-                                      concert.id
-                                    }">
-                                        ${removeIconSVG}
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="conflict-container pl-5" id="conflict-list-${
-                              concert.id
-                            }"></div>
-                        `;
-            itineraryListContainer.appendChild(itemEl);
-
-            if (conflicts.length > 0) {
-              const conflictContainer = itemEl.querySelector(
-                `#conflict-list-${concert.id}`
-              );
-              // Only call populateConflictList if conflictContainer is HTMLElement
-              if (conflictContainer instanceof HTMLElement) {
-                populateConflictList(conflictContainer, conflicts, concert.id);
-              }
-            }
-          });
-        });
-    };
-
-    const populateConflictList = (
-      container: HTMLElement,
-      conflicts: any[],
-      mainConcertId: string
-    ) => {
-      if (!container) return;
-      const removeIconSVG = `<i class="fa-solid fa-xmark"></i>`;
-      container.innerHTML = '';
-      conflicts.forEach((conflict: any) => {
-        const conflictEl = document.createElement('div');
-        conflictEl.className =
-          'p-3 mt-2 bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg';
-
-        conflictEl.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="conflict-swap-item cursor-pointer flex-grow" data-main-id="${mainConcertId}" data-conflict-id="${conflict.id}">
-                                <p class="font-bold text-yellow-800">${conflict.artist} (P${conflict.priority})</p>
-                                <p class="text-sm text-yellow-700">${conflict.startTime} - ${conflict.endTime} @ ${conflict.stage}</p>
-                                <p class="text-sm text-yellow-700">Click to swap</p>
-                            </div>
-                            <button title="Remove conflict" class="remove-conflict-btn p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-100 dark:text-gray-500 dark:hover:text-red-400 dark:hover:bg-gray-700" data-id="${conflict.id}">
-                                ${removeIconSVG}
-                            </button>
-                        </div>
-                    `;
-        container.appendChild(conflictEl);
-      });
-    };
-
-    // --- Event Handlers ---
-    const handleAddClick = (e: Event) => {
-      const button = (e.target as HTMLElement)?.closest(
-        '.add-btn'
-      ) as HTMLElement | null;
-      if (!button) return;
-      const concertId = button.dataset ? button.dataset['id'] : undefined;
-      if (!concertId) return;
-
-      const concert = this.concertData.find((c: any) => c.id === concertId);
-      const existingSelectionIndex = userSelections.findIndex(
-        (s) => s.id === concertId
-      );
-      if (existingSelectionIndex > -1) {
-        userSelections.splice(existingSelectionIndex, 1);
-      } else {
-        const concertElement = button.closest(
-          '.concert-item'
-        ) as HTMLElement | null;
-        if (!concertElement) return;
-        const selectedPriorityBtn = concertElement.querySelector(
-          '.priority-btn.btn-selected'
-        ) as HTMLElement | null;
-
-        // Add the concert with priority 1 as default (will be adjusted by recalculation)
-        const newConcert = {
-          ...concert,
-          priority: 1,
-        };
-        userSelections.push(newConcert);
-
-        // If a priority button was manually selected, force that priority
-        if (selectedPriorityBtn) {
-          const selectedPriority =
-            selectedPriorityBtn && selectedPriorityBtn.dataset
-              ? selectedPriorityBtn.dataset['priority']
-              : undefined;
-          const forcedPriority = parseInt(selectedPriority as string, 10);
-
-          // Force the priority for the newly added concert
-          recalculatePriorities({
-            [newConcert.id]: forcedPriority,
-          });
-        } else {
-          // No forced priority, just recalculate all based on conflicts
-          recalculatePriorities();
-        }
-      }
-      refreshAll();
-    }; // Recalculate priorities for all concerts based on conflicts
-    let forcedPriorities: { [key: string]: any } = {};
-    const recalculatePriorities = (
-      newForcedPriorities: { [key: string]: any } = {}
-    ) => {
-      forcedPriorities = newForcedPriorities;
-
-      // Create a copy of the selections for processing
-      const concertsToProcess = userSelections.map((c) => ({
-        ...c,
-        // Apply forced priorities or keep existing priority
-        priority: forcedPriorities[c.id] || c.priority,
-      }));
-
-      // Sort concerts by their priority (P1 first)
-      concertsToProcess.sort((a, b) => a.priority - b.priority);
-
-      // Build a graph of conflicts for each concert
-      let conflictGraph: { [key: string]: any } = {};
-      concertsToProcess.forEach((concert) => {
-        conflictGraph[concert.id] = concertsToProcess
-          .filter((c) => c.id !== concert.id && checkConflict(c, concert))
+      if (swappedConcert) {
+        // Get all concerts that conflict with the swapped concert
+        const conflictingIds = this.userSelections
+          .filter(
+            (c) =>
+              c.id !== this.lastSwappedId &&
+              this.checkConflict(c, swappedConcert)
+          )
           .map((c) => c.id);
-      });
 
-      // Process each concert and resolve conflicts
-      concertsToProcess.forEach((concert) => {
-        const conflicts = conflictGraph[concert.id];
+        // Temporarily increase the priority of the swapped concert
+        const originalPriority = swappedConcert.priority;
+        swappedConcert.priority = 0; // Lowest possible priority (highest importance)
 
-        // If this concert has a forced priority, adjust conflicting concerts
-        if (forcedPriorities[concert.id]) {
-          const forcedPriority = forcedPriorities[concert.id];
+        // Temporarily decrease the priority of conflicting concerts
+        const originalPriorities = new Map<string, number>();
+        conflictingIds.forEach((id) => {
+          const concert = this.userSelections.find((c) => c.id === id);
+          if (concert) {
+            originalPriorities.set(id, concert.priority);
+            concert.priority = 4; // Higher than the max priority (lowest importance)
+          }
+        });
 
-          conflicts.forEach((conflictId: string) => {
-            const conflictConcert = concertsToProcess.find(
-              (c) => c.id === conflictId
-            );
-            if (conflictConcert && conflictConcert.priority <= forcedPriority) {
-              // Only bump priority if not already forced
-              if (!forcedPriorities[conflictId]) {
-                // If forced P1, conflict becomes P2; if forced P2, conflict becomes P3
-                conflictConcert.priority = Math.min(3, forcedPriority + 1);
-              }
-            }
-          });
-        }
-        // Otherwise, try to get the highest priority possible
-        else {
-          // Get priorities of all conflicts
-          const conflictPriorities = conflicts.map(
-            (id: string) => concertsToProcess.find((c) => c.id === id)?.priority
+        // Regular winner selection logic
+        const sortedSelections = [...this.userSelections].sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority;
+          return (
+            this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime)
           );
+        });
 
-          // If no conflicts, can be P1
-          if (conflictPriorities.length === 0) {
-            concert.priority = 1;
+        const winners: any[] = [];
+        sortedSelections.forEach((concert) => {
+          if (!winners.some((winner) => this.checkConflict(concert, winner))) {
+            winners.push(concert);
           }
-          // Otherwise, find the lowest usable priority
-          else {
-            // Try P1 first
-            if (!conflictPriorities.includes(1)) {
-              concert.priority = 1;
-            }
-            // Then try P2
-            else if (!conflictPriorities.includes(2)) {
-              concert.priority = 2;
-            }
-            // Default to P3 if necessary
-            else {
-              concert.priority = 3;
-            }
+        });
+
+        this.winnerIds = new Set<string>(winners.map((w) => w.id));
+
+        // Restore original priorities
+        swappedConcert.priority = originalPriority;
+        conflictingIds.forEach((id) => {
+          const concert = this.userSelections.find((c) => c.id === id);
+          if (concert && originalPriorities.has(id)) {
+            concert.priority = originalPriorities.get(id)!;
           }
-        }
-      });
+        });
 
-      // Update the original selections with new priorities
-      concertsToProcess.forEach((processed) => {
-        const selection = userSelections.find((s) => s.id === processed.id);
-        if (selection) {
-          selection.priority = processed.priority;
-        }
-      });
-    };
-
-    const handlePriorityClick = (e: Event) => {
-      const button = (e.target as HTMLElement)?.closest(
-        '.priority-btn'
-      ) as HTMLElement | null;
-      if (!button) return;
-      const concertElement = button.closest(
-        '.concert-item'
-      ) as HTMLElement | null;
-      if (!concertElement) return;
-      const selectedPriorityBtn = concertElement.querySelector(
-        '.priority-btn.btn-selected'
-      ) as HTMLElement | null;
-      const priorityGroup = button.closest(
-        '.priority-btn-group'
-      ) as HTMLElement | null;
-      if (!priorityGroup) return;
-      const concertId = priorityGroup.dataset
-        ? priorityGroup.dataset['id']
-        : undefined;
-      if (!concertId) return;
-      const newPriority =
-        button.dataset && button.dataset['priority']
-          ? parseInt(button.dataset['priority'], 10)
-          : undefined;
-      if (newPriority === undefined) return;
-
-      const selectionIndex = userSelections.findIndex(
-        (s) => s.id === concertId
-      );
-
-      if (selectionIndex > -1) {
-        // Force this concert's priority to the selected value
-        const forcedPriorities = {
-          [concertId]: newPriority,
-        }; // Recalculate all priorities with this constraint
-        recalculatePriorities(forcedPriorities);
-
-        // Refresh the UI once with the updated priorities
-        refreshAll();
+        // Clear the lastSwappedId after using it
+        this.lastSwappedId = null;
       } else {
-        const allPriorityButtons =
-          priorityGroup.querySelectorAll('.priority-btn');
-        allPriorityButtons.forEach((btn) =>
-          (btn as HTMLElement).classList.remove('btn-selected')
-        );
-        button.classList.add('btn-selected');
-        refreshAll();
+        // If the swapped concert no longer exists, clear the lastSwappedId
+        this.lastSwappedId = null;
+        this.updateWinnersNormal();
       }
-    };
+    } else {
+      this.updateWinnersNormal();
+    }
+  }
 
-    const handleRemoveItem = (concertIdToRemove: string) => {
-      const indexToRemove = userSelections.findIndex(
-        (c) => c.id === concertIdToRemove
+  private updateWinnersNormal(): void {
+    const sortedSelections = [...this.userSelections].sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime);
+    });
+
+    const winners: any[] = [];
+    sortedSelections.forEach((concert) => {
+      if (!winners.some((winner) => this.checkConflict(concert, winner))) {
+        winners.push(concert);
+      }
+    });
+
+    this.winnerIds = new Set<string>(winners.map((w) => w.id));
+  }
+
+  applyFiltersAndRender(): void {
+    const artistSearch = this.artistSearch.toLowerCase();
+
+    this.filteredConcerts = this.concertData.filter((concert) => {
+      const artistMatch = concert.artist.toLowerCase().includes(artistSearch);
+      const dayMatch =
+        this.selectedDays.length === 0 ||
+        this.selectedDays.includes(concert.day);
+      const stageMatch =
+        this.selectedStages.length === 0 ||
+        this.selectedStages.includes(concert.stage);
+
+      const existingSelection = this.userSelections.find(
+        (s) => s.id === concert.id
       );
-      if (indexToRemove > -1) {
-        userSelections.splice(indexToRemove, 1);
-        refreshAll();
-      }
-    };
+      const isSelected = !!existingSelection;
 
-    const handleItineraryClick = (e: Event) => {
-      const target = e.target as HTMLElement | null;
-      const removeItemBtn = target?.closest(
-        '.remove-item-btn'
-      ) as HTMLElement | null;
-      if (removeItemBtn) {
-        handleRemoveItem(removeItemBtn.getAttribute('data-id')!);
-        return;
-      }
-      const removeConflictBtn = target?.closest(
-        '.remove-conflict-btn'
-      ) as HTMLElement | null;
-      if (removeConflictBtn) {
-        handleRemoveItem(removeConflictBtn.getAttribute('data-id')!);
-        return;
-      }
-      const swapItem = target?.closest(
-        '.conflict-swap-item'
-      ) as HTMLElement | null;
-      if (swapItem) {
-        const mainId = swapItem.dataset
-          ? swapItem.dataset['mainId']
-          : undefined;
-        const conflictId = swapItem.dataset
-          ? swapItem.dataset['conflictId']
-          : undefined;
-        if (!mainId || !conflictId) return;
-        const mainConcertIndex = userSelections.findIndex(
-          (c: any) => c.id === mainId
-        );
-        const conflictConcertIndex = userSelections.findIndex(
-          (c: any) => c.id === conflictId
-        );
-        if (mainConcertIndex > -1 && conflictConcertIndex > -1) {
-          const mainPriority = userSelections[mainConcertIndex].priority;
-          userSelections[mainConcertIndex].priority =
-            userSelections[conflictConcertIndex].priority;
-          userSelections[conflictConcertIndex].priority = mainPriority;
-          refreshAll();
-        }
-        return;
-      }
-    };
+      let priorityMatch =
+        this.selectedPriorities.length === 0 && !this.isNotSelectedChecked;
 
-    const clearPlan = () => {
-      userSelections = [];
-      refreshAll();
-    };
-    const initializeFilters = () => {
-      const dayFilterContainer = document.getElementById(
-        'day-filters'
-      ) as HTMLElement | null;
-      const stageFilterContainer = document.getElementById(
-        'stage-filters'
-      ) as HTMLElement | null;
-      const priorityFilterContainer = document.getElementById(
-        'priority-filters'
-      ) as HTMLElement | null;
-      const artistSearchInput = document.getElementById(
-        'artist-search'
-      ) as HTMLInputElement | null;
-      const resetBtn = document.getElementById(
-        'reset-filters-btn'
-      ) as HTMLElement | null;
-      const dayOrder = ['Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const uniqueDays = getUniqueValues('day').sort(
-        (a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b)
-      );
-      const uniqueStages = getUniqueValues('stage');
-      const priorities = [1, 2, 3];
-      const notSelectedValue = 'not-selected';
-
-      if (dayFilterContainer) {
-        uniqueDays.forEach((day) => {
-          const checkboxDiv = document.createElement('div');
-          checkboxDiv.className = 'flex items-center';
-          checkboxDiv.innerHTML = `<input id="day-${day}" value="${day}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="day-${day}" class="ml-2">${day}</label>`;
-          dayFilterContainer.appendChild(checkboxDiv);
-        });
-      }
-      if (stageFilterContainer) {
-        uniqueStages.forEach((stage) => {
-          const checkboxDiv = document.createElement('div');
-          checkboxDiv.className = 'flex items-center';
-          checkboxDiv.innerHTML = `<input id="stage-${stage}" value="${stage}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="stage-${stage}" class="ml-2">${stage}</label>`;
-          stageFilterContainer.appendChild(checkboxDiv);
-        });
-      }
-      if (priorityFilterContainer) {
-        priorities.forEach((priority) => {
-          const checkboxDiv = document.createElement('div');
-          checkboxDiv.className = 'flex items-center';
-          checkboxDiv.innerHTML = `<input id="priority-${priority}" value="${priority}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="priority-${priority}" class="ml-2">P${priority}</label>`;
-          priorityFilterContainer.appendChild(checkboxDiv);
-        });
-        // Add the "Not selected" checkbox
-        const notSelectedDiv = document.createElement('div');
-        notSelectedDiv.className = 'flex items-center';
-        notSelectedDiv.innerHTML = `<input id="priority-${notSelectedValue}" value="${notSelectedValue}" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"><label for="priority-${notSelectedValue}" class="ml-2">Not selected</label>`;
-        priorityFilterContainer.appendChild(notSelectedDiv);
-      }
-      if (artistSearchInput)
-        artistSearchInput.addEventListener('input', applyFiltersAndRender);
-      if (dayFilterContainer)
-        dayFilterContainer.addEventListener('change', applyFiltersAndRender);
-      if (stageFilterContainer)
-        stageFilterContainer.addEventListener('change', applyFiltersAndRender);
-      if (priorityFilterContainer)
-        priorityFilterContainer.addEventListener(
-          'change',
-          applyFiltersAndRender
+      if (this.isNotSelectedChecked && !isSelected) {
+        priorityMatch = true;
+      } else if (this.selectedPriorities.length > 0 && isSelected) {
+        priorityMatch = this.selectedPriorities.includes(
+          existingSelection.priority
         );
-      if (resetBtn)
-        resetBtn.addEventListener('click', () => {
-          if (artistSearchInput) artistSearchInput.value = '';
-          document
-            .querySelectorAll<HTMLInputElement>(
-              '#filter-container input[type="checkbox"]'
-            )
-            .forEach((cb) => (cb.checked = false));
-          applyFiltersAndRender();
-        });
-      // Always show priority filter section and update styling
-      const updatePriorityFilterVisibility = () => {
-        if (!priorityFilterContainer) return;
-        const priorityFilterSection = priorityFilterContainer.closest(
-          'div.mt-4'
-        ) as HTMLElement | null;
-        if (priorityFilterSection)
-          priorityFilterSection.style.display = 'block';
-        // Update the priority checkboxes to show counts
-        priorities.forEach((priority) => {
-          const checkbox = document.getElementById(
-            `priority-${priority}`
-          ) as HTMLInputElement | null;
-          const label = checkbox
-            ? (checkbox.nextElementSibling as HTMLElement | null)
-            : null;
-          const count = userSelections.filter(
-            (s: any) => s.priority === priority
-          ).length;
-          if (label) {
-            if (count > 0) {
-              label.innerHTML = `P${priority} <span class="ml-1 px-2 py-0.5 text-xs bg-indigo-100 text-indigo-800 rounded-full">${count}</span>`;
-            } else {
-              label.innerHTML = `P${priority}`;
+      }
+
+      return artistMatch && dayMatch && stageMatch && priorityMatch;
+    });
+    this.concertsByDay = this.filteredConcerts.reduce<{
+      [key: string]: Concert[];
+    }>((acc, concert) => {
+      if (!acc[concert.day]) acc[concert.day] = [];
+      acc[concert.day].push(concert);
+      return acc;
+    }, {});
+  }
+  onAddConcert(concert: Concert): void {
+    const existingSelectionIndex = this.userSelections.findIndex(
+      (s) => s.id === concert.id
+    );
+
+    if (existingSelectionIndex > -1) {
+      this.userSelections.splice(existingSelectionIndex, 1);
+    } else {
+      const newConcert = { ...concert, priority: 1 } as ConcertSelection;
+      this.userSelections.push(newConcert);
+    }
+
+    this.refreshAll();
+  }
+  onPriorityClick(concert: Concert, priority: number): void {
+    const selectionIndex = this.userSelections.findIndex(
+      (s) => s.id === concert.id
+    );
+
+    if (selectionIndex > -1) {
+      const forcedPriorities: { [key: string]: number } = {};
+      forcedPriorities[concert.id] = priority;
+      this.recalculatePriorities(forcedPriorities);
+    }
+
+    this.refreshAll();
+  }
+
+  onRemoveConcert(concertId: string): void {
+    const indexToRemove = this.userSelections.findIndex(
+      (c) => c.id === concertId
+    );
+    if (indexToRemove > -1) {
+      this.userSelections.splice(indexToRemove, 1);
+      this.refreshAll();
+    }
+  }
+  onSwapItems(mainId: string, conflictId: string): void {
+    const mainConcertIndex = this.userSelections.findIndex(
+      (c) => c.id === mainId
+    );
+    const conflictConcertIndex = this.userSelections.findIndex(
+      (c) => c.id === conflictId
+    );
+
+    if (mainConcertIndex > -1 && conflictConcertIndex > -1) {
+      // Force the conflict concert to have priority 1 (highest)
+      this.userSelections[conflictConcertIndex].priority = 1;
+
+      // Move the main concert to a lower priority
+      this.userSelections[mainConcertIndex].priority = 3;
+
+      // Mark this as the last swapped concert to prioritize it in winner selection
+      this.lastSwappedId = conflictId;
+
+      this.refreshAll();
+    }
+  }
+
+  clearPlan(): void {
+    this.userSelections = [];
+    this.refreshAll();
+  }
+
+  onFilterChange(): void {
+    this.applyFiltersAndRender();
+  }
+
+  resetFilters(): void {
+    this.artistSearch = '';
+    this.selectedDays = [];
+    this.selectedStages = [];
+    this.selectedPriorities = [];
+    this.isNotSelectedChecked = false;
+    this.applyFiltersAndRender();
+  }
+
+  private recalculatePriorities(
+    forcedPriorities: { [key: string]: number } = {}
+  ): void {
+    const concertsToProcess = this.userSelections.map((c) => ({
+      ...c,
+      priority:
+        forcedPriorities[c.id] !== undefined
+          ? forcedPriorities[c.id]
+          : c.priority,
+    }));
+
+    concertsToProcess.sort((a, b) => a.priority - b.priority);
+
+    let conflictGraph: { [key: string]: string[] } = {};
+    concertsToProcess.forEach((concert) => {
+      conflictGraph[concert.id] = concertsToProcess
+        .filter((c) => c.id !== concert.id && this.checkConflict(c, concert))
+        .map((c) => c.id);
+    });
+
+    concertsToProcess.forEach((concert) => {
+      const conflicts = conflictGraph[concert.id];
+
+      if (forcedPriorities[concert.id] !== undefined) {
+        const forcedPriority = forcedPriorities[concert.id];
+
+        conflicts.forEach((conflictId) => {
+          const conflictConcert = concertsToProcess.find(
+            (c) => c.id === conflictId
+          );
+          if (conflictConcert && conflictConcert.priority <= forcedPriority) {
+            if (forcedPriorities[conflictId] === undefined) {
+              conflictConcert.priority = Math.min(3, forcedPriority + 1);
             }
           }
         });
-        // Update the "Not selected" checkbox to show count
-        const notSelectedCheckbox = document.getElementById(
-          `priority-${notSelectedValue}`
-        ) as HTMLInputElement | null;
-        const notSelectedLabel = notSelectedCheckbox
-          ? (notSelectedCheckbox.nextElementSibling as HTMLElement | null)
-          : null;
-        const notSelectedCount =
-          this.concertData.length - userSelections.length;
-        if (notSelectedLabel) {
-          if (notSelectedCount > 0) {
-            notSelectedLabel.innerHTML = `Not selected <span class="ml-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">${notSelectedCount}</span>`;
+      } else {
+        const conflictPriorities = conflicts.map(
+          (id) => concertsToProcess.find((c) => c.id === id)?.priority
+        );
+
+        if (conflictPriorities.length === 0) {
+          concert.priority = 1;
+        } else {
+          if (!conflictPriorities.includes(1)) {
+            concert.priority = 1;
+          } else if (!conflictPriorities.includes(2)) {
+            concert.priority = 2;
           } else {
-            notSelectedLabel.innerHTML = 'Not selected';
+            concert.priority = 3;
           }
         }
-      };
-      // Initial call to set visibility
-      updatePriorityFilterVisibility();
-      // Update visibility whenever selections change or after filter reset
-      document.addEventListener(
-        'selectionsUpdated',
-        updatePriorityFilterVisibility
-      );
-      if (resetBtn)
-        resetBtn.addEventListener('click', () =>
-          setTimeout(updatePriorityFilterVisibility, 50)
-        );
-    };
+      }
+    });
 
-    // --- Initialisation ---
-    // Removed initialTheme/applyTheme logic (now handled in ngOnInit)
-    loadSelections();
-    initializeFilters();
-    refreshAll();
-    // --- Event Listeners ---
-    // Removed theme toggle event listener (now handled by Angular binding)
-    const concertListElement = document.getElementById(
-      'concert-list'
-    ) as HTMLElement | null;
-    if (concertListElement) {
-      concertListElement.addEventListener('click', (e: Event) => {
-        const target = e.target as HTMLElement | null;
-        if (target?.closest('.add-btn')) {
-          handleAddClick(e);
-        } else if (target?.closest('.priority-btn')) {
-          handlePriorityClick(e);
-        }
-      });
+    concertsToProcess.forEach((processed) => {
+      const selection = this.userSelections.find((s) => s.id === processed.id);
+      if (selection) {
+        selection.priority = processed.priority;
+      }
+    });
+  }
+  private updateItinerary(): void {
+    this.showClearPlanBtn = this.userSelections.length > 0;
+
+    if (this.userSelections.length === 0) {
+      this.itineraryByDay = {};
+      return;
     }
-    if (itineraryListContainer)
-      itineraryListContainer.addEventListener('click', handleItineraryClick);
-    if (clearPlanBtn) clearPlanBtn.addEventListener('click', clearPlan);
+
+    const winners = [...this.userSelections].filter((s) =>
+      this.winnerIds.has(s.id)
+    );
+    const itineraryByDay: Record<string, ConflictItem[]> = {};
+
+    winners
+      .sort(
+        (a, b) =>
+          this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime)
+      )
+      .forEach((winner) => {
+        const day = winner.day;
+        if (!itineraryByDay[day]) itineraryByDay[day] = [];
+
+        itineraryByDay[day].push({
+          concert: winner,
+          conflicts: this.userSelections
+            .filter((c) => c.id !== winner.id && this.checkConflict(c, winner))
+            .sort((a, b) => {
+              const timeCompare =
+                this.timeToMinutes(a.startTime) -
+                this.timeToMinutes(b.startTime);
+              return timeCompare !== 0 ? timeCompare : a.priority - b.priority;
+            }),
+        });
+      });
+
+    this.itineraryByDay = itineraryByDay;
+  }
+
+  private updatePriorityCounts(): void {
+    this.priorityCounts = { 1: 0, 2: 0, 3: 0 };
+
+    this.userSelections.forEach((selection) => {
+      if (this.priorityCounts[selection.priority] !== undefined) {
+        this.priorityCounts[selection.priority]++;
+      }
+    });
+
+    this.notSelectedCount =
+      this.concertData.length - this.userSelections.length;
+  }
+
+  isConcertSelected(concertId: string): boolean {
+    return this.userSelections.some((s) => s.id === concertId);
+  }
+
+  isConcertWinner(concertId: string): boolean {
+    return this.winnerIds.has(concertId);
+  }
+
+  getConcertPriority(concertId: string): number | null {
+    const selection = this.userSelections.find((s) => s.id === concertId);
+    return selection ? selection.priority : null;
+  }
+
+  isDaySelected(day: string): boolean {
+    return (
+      this.concertsByDay[day]?.some(
+        (concert) =>
+          this.userSelections.some((s) => s.id === concert.id) &&
+          this.winnerIds.has(concert.id)
+      ) || false
+    );
+  }
+
+  isDayConflicted(day: string): boolean {
+    return (
+      this.concertsByDay[day]?.some(
+        (concert) =>
+          this.userSelections.some((s) => s.id === concert.id) &&
+          !this.winnerIds.has(concert.id)
+      ) || false
+    );
+  }
+
+  toggleDayFilter(day: string): void {
+    if (this.selectedDays.includes(day)) {
+      this.selectedDays = this.selectedDays.filter((d) => d !== day);
+    } else {
+      this.selectedDays.push(day);
+    }
+    this.onFilterChange();
+  }
+
+  toggleStageFilter(stage: string): void {
+    if (this.selectedStages.includes(stage)) {
+      this.selectedStages = this.selectedStages.filter((s) => s !== stage);
+    } else {
+      this.selectedStages.push(stage);
+    }
+    this.onFilterChange();
+  }
+
+  togglePriorityFilter(priority: number): void {
+    if (this.selectedPriorities.includes(priority)) {
+      this.selectedPriorities = this.selectedPriorities.filter(
+        (p) => p !== priority
+      );
+    } else {
+      this.selectedPriorities.push(priority);
+    }
+    this.onFilterChange();
   }
 }

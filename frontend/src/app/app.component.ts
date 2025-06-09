@@ -295,7 +295,23 @@ export class AppComponent implements OnInit {
     if (existingSelectionIndex > -1) {
       this.userSelections.splice(existingSelectionIndex, 1);
     } else {
-      const newConcert = { ...concert, priority: 1 } as ConcertSelection;
+      // Find any existing conflicts first
+      const conflicts = this.userSelections.filter((selection) =>
+        this.checkConflict(selection, concert)
+      );
+
+      // Determine the appropriate priority for the new concert
+      let newPriority = 1;
+      if (conflicts.length > 0) {
+        // If there are conflicts, set the new concert to priority 2 (lower priority)
+        // This will ensure existing concerts keep their priority
+        newPriority = 2;
+      }
+
+      const newConcert = {
+        ...concert,
+        priority: newPriority,
+      } as ConcertSelection;
       this.userSelections.push(newConcert);
     }
 
@@ -314,13 +330,46 @@ export class AppComponent implements OnInit {
 
     this.refreshAll();
   }
-
   onRemoveConcert(concertId: string): void {
     const indexToRemove = this.userSelections.findIndex(
       (c) => c.id === concertId
     );
     if (indexToRemove > -1) {
+      // Get the concert to be removed
+      const removedConcert = this.userSelections[indexToRemove];
+
+      // Find any concerts that were in conflict with the removed concert
+      const conflictingConcerts = this.userSelections.filter(
+        (selection) =>
+          selection.id !== concertId &&
+          this.checkConflict(selection, removedConcert)
+      );
+
+      // Remove the concert
       this.userSelections.splice(indexToRemove, 1);
+
+      // If there were conflicts, check if any remaining conflicts have higher priorities
+      // that should be moved up now that the removed concert is gone
+      if (conflictingConcerts.length > 0) {
+        // Sort conflicts by priority, lowest value (highest priority) first
+        conflictingConcerts.sort((a, b) => a.priority - b.priority);
+
+        // Check if any of the conflicts need their priority upgraded
+        // This ensures the highest priority concert becomes P1, the next P2, etc.
+        conflictingConcerts.forEach((concert, index) => {
+          const newPriority = index + 1; // P1, P2, P3
+          if (newPriority < concert.priority) {
+            // Update to a higher priority (lower number)
+            const selection = this.userSelections.find(
+              (s) => s.id === concert.id
+            );
+            if (selection) {
+              selection.priority = newPriority;
+            }
+          }
+        });
+      }
+
       this.refreshAll();
     }
   }
@@ -333,11 +382,38 @@ export class AppComponent implements OnInit {
     );
 
     if (mainConcertIndex > -1 && conflictConcertIndex > -1) {
+      // Get both concerts
+      const mainConcert = this.userSelections[mainConcertIndex];
+      const conflictConcert = this.userSelections[conflictConcertIndex];
+
       // Force the conflict concert to have priority 1 (highest)
       this.userSelections[conflictConcertIndex].priority = 1;
 
-      // Move the main concert to a lower priority
-      this.userSelections[mainConcertIndex].priority = 3;
+      // Find all concerts that conflict with the newly prioritized concert
+      const conflicts = this.userSelections.filter(
+        (selection) =>
+          selection.id !== conflictId &&
+          selection.id !== mainId &&
+          this.checkConflict(selection, conflictConcert)
+      );
+
+      // Find the next available priority for the main concert
+      let availablePriorities = [1, 2, 3];
+
+      // Priority 1 is taken by the conflict concert
+      availablePriorities = availablePriorities.filter((p) => p !== 1);
+
+      // Remove any priorities already used by other conflicts
+      conflicts.forEach((c) => {
+        availablePriorities = availablePriorities.filter(
+          (p) => p !== c.priority
+        );
+      });
+
+      // Assign the next available priority, or 3 if all are taken
+      const nextPriority =
+        availablePriorities.length > 0 ? Math.min(...availablePriorities) : 2;
+      this.userSelections[mainConcertIndex].priority = nextPriority;
 
       // Mark this as the last swapped concert to prioritize it in winner selection
       this.lastSwappedId = conflictId;

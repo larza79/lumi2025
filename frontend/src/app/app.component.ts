@@ -56,6 +56,14 @@ export class AppComponent implements OnInit {
   selectedPriorities: number[] = [];
   isNotSelectedChecked = false;
 
+  // Computed properties - for template access
+  selectedConcerts: { [key: string]: boolean } = {};
+  winnerConcerts: { [key: string]: boolean } = {};
+  concertPriorities: { [key: string]: number | null } = {};
+  selectedConcertsCount = 0;
+  winnerConcertsCount = 0;
+  conflictConcertsCount = 0;
+
   // Constants
   readonly dayOrder = ['Thursday', 'Friday', 'Saturday', 'Sunday'];
   readonly priorities = [1, 2, 3];
@@ -103,15 +111,19 @@ export class AppComponent implements OnInit {
       (!savedTheme &&
         window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', this.isDarkMode);
-  }
-
-  // Setup data and subscriptions
+  } // Setup data and subscriptions
   private initData(): void {
     // Use the imported concert data from data/concert-data.ts
     this.concertData = festivalData.map((concert, index) => {
+      // Calculate duration directly when mapping the data
+      const startTime = concert['startTime'] as string;
+      const endTime = concert['endTime'] as string;
+      const durationMins = this.calculateDuration(startTime, endTime);
+
       return {
         ...concert,
         id: `concert-${index}`,
+        durationMins: durationMins,
       } as Concert;
     });
 
@@ -129,12 +141,19 @@ export class AppComponent implements OnInit {
     this.itineraryService.userSelections$.subscribe((selections) => {
       this.userSelections = selections;
       this.showClearPlanBtn = selections.length > 0;
+
+      // Update the computed properties
+      this.updateComputedProperties();
+
       this.applyFiltersAndRender();
     });
 
     // Subscribe to winner IDs
     this.itineraryService.winnerIds$.subscribe((ids) => {
       this.winnerIds = ids;
+
+      // Update winner-related computed properties
+      this.updateWinnerProperties();
     });
 
     // Subscribe to itinerary by day
@@ -153,6 +172,42 @@ export class AppComponent implements OnInit {
     });
   }
 
+  // Update all computed properties used in the template
+  private updateComputedProperties(): void {
+    this.updateSelectedProperties();
+    this.updateWinnerProperties();
+    this.updateCountProperties();
+  }
+
+  // Update selection-related properties
+  private updateSelectedProperties(): void {
+    // Reset
+    this.selectedConcerts = {};
+    this.concertPriorities = {};
+
+    // Update with current data
+    this.userSelections.forEach((selection) => {
+      this.selectedConcerts[selection.id] = true;
+      this.concertPriorities[selection.id] = selection.priority;
+    });
+  }
+
+  // Update winner-related properties
+  private updateWinnerProperties(): void {
+    this.winnerConcerts = {};
+    this.winnerIds.forEach((id) => {
+      this.winnerConcerts[id] = true;
+    });
+  }
+
+  // Update count properties
+  private updateCountProperties(): void {
+    this.selectedConcertsCount = this.userSelections.length;
+    this.winnerConcertsCount = this.winnerIds.size;
+    this.conflictConcertsCount =
+      this.selectedConcertsCount - this.winnerConcertsCount;
+  }
+
   private getUniqueValues(key: string): string[] {
     return [
       ...new Set(this.concertData.map((item) => String(item[key]))),
@@ -166,8 +221,13 @@ export class AppComponent implements OnInit {
   }
 
   // Helper method to calculate duration between times
-  getDuration(start: string, end: string): number {
+  private calculateDuration(start: string, end: string): number {
     return this.timeToMinutes(end) - this.timeToMinutes(start);
+  }
+
+  // For backward compatibility - will be removed from template
+  getDuration(start: string, end: string): number {
+    return this.calculateDuration(start, end);
   }
 
   // Filter and rendering
@@ -183,10 +243,7 @@ export class AppComponent implements OnInit {
         this.selectedStages.length === 0 ||
         this.selectedStages.includes(concert.stage);
 
-      const existingSelection = this.userSelections.find(
-        (s) => s.id === concert.id
-      );
-      const isSelected = !!existingSelection;
+      const isSelected = this.selectedConcerts[concert.id] || false;
 
       let priorityMatch =
         this.selectedPriorities.length === 0 && !this.isNotSelectedChecked;
@@ -194,9 +251,10 @@ export class AppComponent implements OnInit {
       if (this.isNotSelectedChecked && !isSelected) {
         priorityMatch = true;
       } else if (this.selectedPriorities.length > 0 && isSelected) {
-        priorityMatch = this.selectedPriorities.includes(
-          existingSelection.priority
-        );
+        const priority = this.concertPriorities[concert.id];
+        priorityMatch = priority
+          ? this.selectedPriorities.includes(priority)
+          : false;
       }
 
       return artistMatch && dayMatch && stageMatch && priorityMatch;
@@ -217,7 +275,7 @@ export class AppComponent implements OnInit {
   }
 
   onPriorityClick(concert: Concert, priority: number): void {
-    if (this.itineraryService.isConcertSelected(concert.id)) {
+    if (this.selectedConcerts[concert.id]) {
       this.itineraryService.updateConcertPriority(concert.id, priority);
     }
   }
@@ -277,25 +335,24 @@ export class AppComponent implements OnInit {
     this.onFilterChange();
   }
 
-  // Helper methods delegated to service
+  // Helper methods - will be removed from template
   isConcertSelected(concertId: string): boolean {
-    return this.itineraryService.isConcertSelected(concertId);
+    return this.selectedConcerts[concertId] || false;
   }
 
   isConcertWinner(concertId: string): boolean {
-    return this.itineraryService.isConcertWinner(concertId);
+    return this.winnerConcerts[concertId] || false;
   }
 
   getConcertPriority(concertId: string): number | null {
-    return this.itineraryService.getConcertPriority(concertId);
+    return this.concertPriorities[concertId] || null;
   }
 
   isDaySelected(day: string): boolean {
     return (
       this.concertsByDay[day]?.some(
         (concert) =>
-          this.itineraryService.isConcertSelected(concert.id) &&
-          this.itineraryService.isConcertWinner(concert.id)
+          this.selectedConcerts[concert.id] && this.winnerConcerts[concert.id]
       ) || false
     );
   }
@@ -304,22 +361,21 @@ export class AppComponent implements OnInit {
     return (
       this.concertsByDay[day]?.some(
         (concert) =>
-          this.itineraryService.isConcertSelected(concert.id) &&
-          !this.itineraryService.isConcertWinner(concert.id)
+          this.selectedConcerts[concert.id] && !this.winnerConcerts[concert.id]
       ) || false
     );
   }
 
-  // Badge count methods
+  // Badge count methods - will be removed from template
   getSelectedConcertsCount(): number {
-    return this.userSelections.length;
+    return this.selectedConcertsCount;
   }
 
   getWinnerConcertsCount(): number {
-    return this.winnerIds.size;
+    return this.winnerConcertsCount;
   }
 
   getConflictConcertsCount(): number {
-    return this.userSelections.length - this.winnerIds.size;
+    return this.conflictConcertsCount;
   }
 }

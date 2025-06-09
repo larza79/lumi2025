@@ -41,22 +41,22 @@
     >
       Itinerary
       <div
-        *ngIf="getSelectedConcertsCount() > 0"
+        *ngIf="selectedConcertsCount > 0"
         class="inline-flex items-center ml-2"
       >
         <!-- Badge for winner concerts -->
         <span
-          *ngIf="getWinnerConcertsCount() > 0"
+          *ngIf="winnerConcertsCount > 0"
           class="px-2 py-0.5 ml-1 text-xs bg-green-100 text-green-800 rounded-full dark:bg-green-900 dark:text-green-200"
         >
-          {{ getWinnerConcertsCount() }}
+          {{ winnerConcertsCount }}
         </span>
         <!-- Badge for conflicting concerts -->
         <span
-          *ngIf="getConflictConcertsCount() > 0"
+          *ngIf="conflictConcertsCount > 0"
           class="px-2 py-0.5 ml-1 text-xs bg-amber-100 text-amber-800 rounded-full dark:bg-amber-900 dark:text-amber-200"
         >
-          {{ getConflictConcertsCount() }}
+          {{ conflictConcertsCount }}
         </span>
       </div>
     </button>
@@ -223,19 +223,15 @@
                 class="flex justify-between p-3"
                 [ngClass]="{
                   'bg-green-50':
-                    isConcertWinner(concert.id) &&
-                    isConcertSelected(concert.id),
+                    winnerConcerts[concert.id] && selectedConcerts[concert.id],
                   'dark:bg-green-900':
-                    isConcertWinner(concert.id) &&
-                    isConcertSelected(concert.id),
+                    winnerConcerts[concert.id] && selectedConcerts[concert.id],
                   'bg-amber-50':
-                    !isConcertWinner(concert.id) &&
-                    isConcertSelected(concert.id),
+                    !winnerConcerts[concert.id] && selectedConcerts[concert.id],
                   'dark:bg-amber-900':
-                    !isConcertWinner(concert.id) &&
-                    isConcertSelected(concert.id),
-                  'bg-gray-50': !isConcertSelected(concert.id),
-                  'dark:bg-gray-700': !isConcertSelected(concert.id)
+                    !winnerConcerts[concert.id] && selectedConcerts[concert.id],
+                  'bg-gray-50': !selectedConcerts[concert.id],
+                  'dark:bg-gray-700': !selectedConcerts[concert.id]
                 }"
               >
                 <div class="flex flex-col">
@@ -248,10 +244,7 @@
                   <p class="text-sm text-gray-600 dark:text-gray-300">
                     {{ concert.startTime }} - {{ concert.endTime }}
                     <span class="ml-1 text-xs"
-                      >({{
-                        getDuration(concert.startTime, concert.endTime)
-                      }}
-                      min)</span
+                      >({{ concert.durationMins }} min)</span
                     >
                   </p>
                 </div>
@@ -266,35 +259,35 @@
                       [class.border-r-0]="i !== priorities.length - 1"
                       [ngClass]="{
                         'bg-indigo-500':
-                          isConcertSelected(concert.id) &&
-                          getConcertPriority(concert.id) === p,
+                          selectedConcerts[concert.id] &&
+                          concertPriorities[concert.id] === p,
                         'text-white':
-                          isConcertSelected(concert.id) &&
-                          getConcertPriority(concert.id) === p,
+                          selectedConcerts[concert.id] &&
+                          concertPriorities[concert.id] === p,
                         'hover:bg-indigo-600':
-                          isConcertSelected(concert.id) &&
-                          getConcertPriority(concert.id) === p,
+                          selectedConcerts[concert.id] &&
+                          concertPriorities[concert.id] === p,
                         'bg-white':
-                          !isConcertSelected(concert.id) ||
-                          getConcertPriority(concert.id) !== p,
+                          !selectedConcerts[concert.id] ||
+                          concertPriorities[concert.id] !== p,
                         'border-gray-300':
-                          !isConcertSelected(concert.id) ||
-                          getConcertPriority(concert.id) !== p,
+                          !selectedConcerts[concert.id] ||
+                          concertPriorities[concert.id] !== p,
                         'dark:border-gray-500':
-                          !isConcertSelected(concert.id) ||
-                          getConcertPriority(concert.id) !== p,
+                          !selectedConcerts[concert.id] ||
+                          concertPriorities[concert.id] !== p,
                         'hover:bg-gray-200':
-                          !isConcertSelected(concert.id) ||
-                          getConcertPriority(concert.id) !== p,
+                          !selectedConcerts[concert.id] ||
+                          concertPriorities[concert.id] !== p,
                         'dark:hover:bg-gray-600':
-                          !isConcertSelected(concert.id) ||
-                          getConcertPriority(concert.id) !== p,
+                          !selectedConcerts[concert.id] ||
+                          concertPriorities[concert.id] !== p,
                         'dark:bg-gray-800':
-                          !isConcertSelected(concert.id) ||
-                          getConcertPriority(concert.id) !== p,
+                          !selectedConcerts[concert.id] ||
+                          concertPriorities[concert.id] !== p,
                         'dark:text-gray-300':
-                          !isConcertSelected(concert.id) ||
-                          getConcertPriority(concert.id) !== p
+                          !selectedConcerts[concert.id] ||
+                          concertPriorities[concert.id] !== p
                       }"
                       (click)="onPriorityClick(concert, p)"
                     >
@@ -305,21 +298,21 @@
                   <button
                     class="px-3 py-1 text-sm font-medium rounded-md flex items-center"
                     [ngClass]="{
-                      'bg-indigo-500': !isConcertSelected(concert.id),
-                      'text-white': !isConcertSelected(concert.id),
-                      'hover:bg-indigo-600': !isConcertSelected(concert.id),
-                      'bg-green-100': isConcertSelected(concert.id),
-                      'text-green-800': isConcertSelected(concert.id),
-                      'hover:bg-green-200': isConcertSelected(concert.id),
-                      'dark:bg-green-900': isConcertSelected(concert.id),
-                      'dark:text-green-200': isConcertSelected(concert.id),
-                      'dark:hover:bg-green-800': isConcertSelected(concert.id)
+                      'bg-indigo-500': !selectedConcerts[concert.id],
+                      'text-white': !selectedConcerts[concert.id],
+                      'hover:bg-indigo-600': !selectedConcerts[concert.id],
+                      'bg-green-100': selectedConcerts[concert.id],
+                      'text-green-800': selectedConcerts[concert.id],
+                      'hover:bg-green-200': selectedConcerts[concert.id],
+                      'dark:bg-green-900': selectedConcerts[concert.id],
+                      'dark:text-green-200': selectedConcerts[concert.id],
+                      'dark:hover:bg-green-800': selectedConcerts[concert.id]
                     }"
                     (click)="onAddConcert(concert)"
                   >
-                    <span *ngIf="!isConcertSelected(concert.id)">Add</span>
+                    <span *ngIf="!selectedConcerts[concert.id]">Add</span>
                     <span
-                      *ngIf="isConcertSelected(concert.id)"
+                      *ngIf="selectedConcerts[concert.id]"
                       class="flex items-center"
                     >
                       <i class="fa-solid fa-check mr-1"></i> Added
@@ -344,20 +337,20 @@
           class="text-2xl font-semibold mb-4 border-b dark:border-gray-600 pb-2 dark:text-white flex justify-between items-center"
         >
           Your Itinerary
-          <div *ngIf="getSelectedConcertsCount() > 0" class="flex items-center">
+          <div *ngIf="selectedConcertsCount > 0" class="flex items-center">
             <!-- Badge for winner concerts -->
             <span
-              *ngIf="getWinnerConcertsCount() > 0"
+              *ngIf="winnerConcertsCount > 0"
               class="px-2 py-0.5 ml-1 text-xs bg-green-100 text-green-800 rounded-full dark:bg-green-900 dark:text-green-200"
             >
-              {{ getWinnerConcertsCount() }}
+              {{ winnerConcertsCount }}
             </span>
             <!-- Badge for conflicting concerts -->
             <span
-              *ngIf="getConflictConcertsCount() > 0"
+              *ngIf="conflictConcertsCount > 0"
               class="px-2 py-0.5 ml-1 text-xs bg-amber-100 text-amber-800 rounded-full dark:bg-amber-900 dark:text-amber-200"
             >
-              {{ getConflictConcertsCount() }}
+              {{ conflictConcertsCount }}
             </span>
           </div>
         </h2>
@@ -390,13 +383,7 @@
                         {{ item.concert.startTime }} -
                         {{ item.concert.endTime }}
                         <span class="ml-1 text-xs"
-                          >({{
-                            getDuration(
-                              item.concert.startTime,
-                              item.concert.endTime
-                            )
-                          }}
-                          min)</span
+                          >({{ item.concert.durationMins }} min)</span
                         >
                       </p>
                     </div>

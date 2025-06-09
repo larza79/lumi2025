@@ -6,7 +6,8 @@ export interface Concert {
   startTime: string;
   endTime: string;
   artist: string;
-  [key: string]: string | number | undefined;  // Index signature for dynamic property access
+  durationMins?: number; // Duration in minutes between start and end time
+  [key: string]: string | number | undefined; // Index signature for dynamic property access
 }
 
 export interface ConcertSelection extends Concert {

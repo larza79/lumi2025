@@ -13,6 +13,7 @@ import {
   ConflictItem,
 } from './models/concert.model';
 import { concertData as festivalData } from './data/concert-data';
+import { ItineraryService } from './services/itinerary.service';
 
 @Component({
   selector: 'app-root',
@@ -23,21 +24,28 @@ import { concertData as festivalData } from './data/concert-data';
   standalone: true,
 })
 export class AppComponent implements OnInit {
+  title = 'lumi-app';
+
   // UI State
   activeTab: 'concerts' | 'itinerary' = 'concerts';
   isMobile = false;
   showFilter = true;
   isDarkMode = false;
+
   // Concert Data
   concertData: Concert[] = [];
+  filteredConcerts: Concert[] = [];
+
+  // Imported from service
   userSelections: ConcertSelection[] = [];
   winnerIds = new Set<string>();
-  filteredConcerts: Concert[] = [];
-  lastSwappedId: string | null = null; // Track the last swapped concert ID
+  itineraryByDay: { [key: string]: ConflictItem[] } = {};
+  priorityCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0 };
+  notSelectedCount = 0;
+  showClearPlanBtn = false;
 
   // Organized Collections
   concertsByDay: { [key: string]: Concert[] } = {};
-  itineraryByDay: { [key: string]: ConflictItem[] } = {};
   uniqueDays: string[] = [];
   uniqueStages: string[] = [];
 
@@ -48,17 +56,12 @@ export class AppComponent implements OnInit {
   selectedPriorities: number[] = [];
   isNotSelectedChecked = false;
 
-  // UI Helpers
-  showClearPlanBtn = false;
-
   // Constants
   readonly dayOrder = ['Thursday', 'Friday', 'Saturday', 'Sunday'];
   readonly priorities = [1, 2, 3];
   readonly notSelectedValue = 'not-selected';
 
-  // Priority counts
-  priorityCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0 };
-  notSelectedCount = 0;
+  constructor(private itineraryService: ItineraryService) {}
 
   @HostListener('window:resize', ['$event'])
   onResize() {
@@ -67,12 +70,13 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.initData();
-    this.loadSelections();
+    this.subscribeToConcertData();
     this.checkScreenSize();
     this.initTheme();
-    this.refreshAll();
+    this.applyFiltersAndRender();
   }
 
+  // UI Helpers
   toggleFilter(): void {
     this.showFilter = !this.showFilter;
   }
@@ -82,6 +86,7 @@ export class AppComponent implements OnInit {
     document.documentElement.classList.toggle('dark', this.isDarkMode);
     localStorage.setItem('theme', this.isDarkMode ? 'dark' : 'light');
   }
+
   checkScreenSize(): void {
     this.isMobile = window.innerWidth < 1024;
     if (this.isMobile) {
@@ -90,6 +95,7 @@ export class AppComponent implements OnInit {
       this.showFilter = true;
     }
   }
+
   initTheme(): void {
     const savedTheme = localStorage.getItem('theme');
     this.isDarkMode =
@@ -99,6 +105,7 @@ export class AppComponent implements OnInit {
     document.documentElement.classList.toggle('dark', this.isDarkMode);
   }
 
+  // Setup data and subscriptions
   private initData(): void {
     // Use the imported concert data from data/concert-data.ts
     this.concertData = festivalData.map((concert, index) => {
@@ -112,143 +119,58 @@ export class AppComponent implements OnInit {
       (a, b) => this.dayOrder.indexOf(a) - this.dayOrder.indexOf(b)
     );
     this.uniqueStages = this.getUniqueValues('stage');
-    this.notSelectedCount = this.concertData.length;
+
+    // Set total concerts count in service
+    this.itineraryService.setTotalConcerts(this.concertData.length);
   }
+
+  private subscribeToConcertData() {
+    // Subscribe to user selections from the itinerary service
+    this.itineraryService.userSelections$.subscribe((selections) => {
+      this.userSelections = selections;
+      this.showClearPlanBtn = selections.length > 0;
+      this.applyFiltersAndRender();
+    });
+
+    // Subscribe to winner IDs
+    this.itineraryService.winnerIds$.subscribe((ids) => {
+      this.winnerIds = ids;
+    });
+
+    // Subscribe to itinerary by day
+    this.itineraryService.itineraryByDay$.subscribe((data) => {
+      this.itineraryByDay = data;
+    });
+
+    // Subscribe to priority counts
+    this.itineraryService.priorityCounts$.subscribe((counts) => {
+      this.priorityCounts = counts;
+    });
+
+    // Subscribe to not selected count
+    this.itineraryService.notSelectedCount$.subscribe((count) => {
+      this.notSelectedCount = count;
+    });
+  }
+
   private getUniqueValues(key: string): string[] {
     return [
       ...new Set(this.concertData.map((item) => String(item[key]))),
     ].sort();
   }
 
+  // Helper to convert time string to minutes for duration calculations
   private timeToMinutes(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
   }
 
+  // Helper method to calculate duration between times
   getDuration(start: string, end: string): number {
     return this.timeToMinutes(end) - this.timeToMinutes(start);
   }
-  private checkConflict(
-    concertA: Concert | ConcertSelection,
-    concertB: Concert | ConcertSelection
-  ): boolean {
-    if (concertA.day !== concertB.day) return false;
-    const startA = this.timeToMinutes(concertA.startTime);
-    const endA = this.timeToMinutes(concertA.endTime);
-    const startB = this.timeToMinutes(concertB.startTime);
-    const endB = this.timeToMinutes(concertB.endTime);
-    const overlap = Math.max(
-      0,
-      Math.min(endA, endB) - Math.max(startA, startB)
-    );
-    return overlap > 15;
-  }
 
-  refreshAll(): void {
-    this.updateWinners();
-    this.applyFiltersAndRender();
-    this.updateItinerary();
-    this.saveSelections();
-    this.updatePriorityCounts();
-  }
-
-  private saveSelections(): void {
-    localStorage.setItem(
-      'festivalPlannerSelections',
-      JSON.stringify(this.userSelections)
-    );
-  }
-
-  private loadSelections(): void {
-    const savedData = localStorage.getItem('festivalPlannerSelections');
-    if (savedData) this.userSelections = JSON.parse(savedData);
-  }
-
-  private updateWinners(): void {
-    // If there's a recently swapped conflict, make sure it becomes a winner
-    if (this.lastSwappedId) {
-      // Find all conflicting concerts with the swapped concert
-      const swappedConcert = this.userSelections.find(
-        (c) => c.id === this.lastSwappedId
-      );
-      if (swappedConcert) {
-        // Get all concerts that conflict with the swapped concert
-        const conflictingIds = this.userSelections
-          .filter(
-            (c) =>
-              c.id !== this.lastSwappedId &&
-              this.checkConflict(c, swappedConcert)
-          )
-          .map((c) => c.id);
-
-        // Temporarily increase the priority of the swapped concert
-        const originalPriority = swappedConcert.priority;
-        swappedConcert.priority = 0; // Lowest possible priority (highest importance)
-
-        // Temporarily decrease the priority of conflicting concerts
-        const originalPriorities = new Map<string, number>();
-        conflictingIds.forEach((id) => {
-          const concert = this.userSelections.find((c) => c.id === id);
-          if (concert) {
-            originalPriorities.set(id, concert.priority);
-            concert.priority = 4; // Higher than the max priority (lowest importance)
-          }
-        });
-
-        // Regular winner selection logic
-        const sortedSelections = [...this.userSelections].sort((a, b) => {
-          if (a.priority !== b.priority) return a.priority - b.priority;
-          return (
-            this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime)
-          );
-        });
-
-        const winners: any[] = [];
-        sortedSelections.forEach((concert) => {
-          if (!winners.some((winner) => this.checkConflict(concert, winner))) {
-            winners.push(concert);
-          }
-        });
-
-        this.winnerIds = new Set<string>(winners.map((w) => w.id));
-
-        // Restore original priorities
-        swappedConcert.priority = originalPriority;
-        conflictingIds.forEach((id) => {
-          const concert = this.userSelections.find((c) => c.id === id);
-          if (concert && originalPriorities.has(id)) {
-            concert.priority = originalPriorities.get(id)!;
-          }
-        });
-
-        // Clear the lastSwappedId after using it
-        this.lastSwappedId = null;
-      } else {
-        // If the swapped concert no longer exists, clear the lastSwappedId
-        this.lastSwappedId = null;
-        this.updateWinnersNormal();
-      }
-    } else {
-      this.updateWinnersNormal();
-    }
-  }
-
-  private updateWinnersNormal(): void {
-    const sortedSelections = [...this.userSelections].sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      return this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime);
-    });
-
-    const winners: any[] = [];
-    sortedSelections.forEach((concert) => {
-      if (!winners.some((winner) => this.checkConflict(concert, winner))) {
-        winners.push(concert);
-      }
-    });
-
-    this.winnerIds = new Set<string>(winners.map((w) => w.id));
-  }
-
+  // Filter and rendering
   applyFiltersAndRender(): void {
     const artistSearch = this.artistSearch.toLowerCase();
 
@@ -279,6 +201,7 @@ export class AppComponent implements OnInit {
 
       return artistMatch && dayMatch && stageMatch && priorityMatch;
     });
+
     this.concertsByDay = this.filteredConcerts.reduce<{
       [key: string]: Concert[];
     }>((acc, concert) => {
@@ -287,146 +210,31 @@ export class AppComponent implements OnInit {
       return acc;
     }, {});
   }
+
+  // Concert operations - delegated to service
   onAddConcert(concert: Concert): void {
-    const existingSelectionIndex = this.userSelections.findIndex(
-      (s) => s.id === concert.id
-    );
-
-    if (existingSelectionIndex > -1) {
-      this.userSelections.splice(existingSelectionIndex, 1);
-    } else {
-      // Find any existing conflicts first
-      const conflicts = this.userSelections.filter((selection) =>
-        this.checkConflict(selection, concert)
-      );
-
-      // Determine the appropriate priority for the new concert
-      let newPriority = 1;
-      if (conflicts.length > 0) {
-        // If there are conflicts, set the new concert to priority 2 (lower priority)
-        // This will ensure existing concerts keep their priority
-        newPriority = 2;
-      }
-
-      const newConcert = {
-        ...concert,
-        priority: newPriority,
-      } as ConcertSelection;
-      this.userSelections.push(newConcert);
-    }
-
-    this.refreshAll();
+    this.itineraryService.addConcert(concert);
   }
+
   onPriorityClick(concert: Concert, priority: number): void {
-    const selectionIndex = this.userSelections.findIndex(
-      (s) => s.id === concert.id
-    );
-
-    if (selectionIndex > -1) {
-      const forcedPriorities: { [key: string]: number } = {};
-      forcedPriorities[concert.id] = priority;
-      this.recalculatePriorities(forcedPriorities);
+    if (this.itineraryService.isConcertSelected(concert.id)) {
+      this.itineraryService.updateConcertPriority(concert.id, priority);
     }
-
-    this.refreshAll();
   }
+
   onRemoveConcert(concertId: string): void {
-    const indexToRemove = this.userSelections.findIndex(
-      (c) => c.id === concertId
-    );
-    if (indexToRemove > -1) {
-      // Get the concert to be removed
-      const removedConcert = this.userSelections[indexToRemove];
-
-      // Find any concerts that were in conflict with the removed concert
-      const conflictingConcerts = this.userSelections.filter(
-        (selection) =>
-          selection.id !== concertId &&
-          this.checkConflict(selection, removedConcert)
-      );
-
-      // Remove the concert
-      this.userSelections.splice(indexToRemove, 1);
-
-      // If there were conflicts, check if any remaining conflicts have higher priorities
-      // that should be moved up now that the removed concert is gone
-      if (conflictingConcerts.length > 0) {
-        // Sort conflicts by priority, lowest value (highest priority) first
-        conflictingConcerts.sort((a, b) => a.priority - b.priority);
-
-        // Check if any of the conflicts need their priority upgraded
-        // This ensures the highest priority concert becomes P1, the next P2, etc.
-        conflictingConcerts.forEach((concert, index) => {
-          const newPriority = index + 1; // P1, P2, P3
-          if (newPriority < concert.priority) {
-            // Update to a higher priority (lower number)
-            const selection = this.userSelections.find(
-              (s) => s.id === concert.id
-            );
-            if (selection) {
-              selection.priority = newPriority;
-            }
-          }
-        });
-      }
-
-      this.refreshAll();
-    }
+    this.itineraryService.removeConcert(concertId);
   }
+
   onSwapItems(mainId: string, conflictId: string): void {
-    const mainConcertIndex = this.userSelections.findIndex(
-      (c) => c.id === mainId
-    );
-    const conflictConcertIndex = this.userSelections.findIndex(
-      (c) => c.id === conflictId
-    );
-
-    if (mainConcertIndex > -1 && conflictConcertIndex > -1) {
-      // Get both concerts
-      const mainConcert = this.userSelections[mainConcertIndex];
-      const conflictConcert = this.userSelections[conflictConcertIndex];
-
-      // Force the conflict concert to have priority 1 (highest)
-      this.userSelections[conflictConcertIndex].priority = 1;
-
-      // Find all concerts that conflict with the newly prioritized concert
-      const conflicts = this.userSelections.filter(
-        (selection) =>
-          selection.id !== conflictId &&
-          selection.id !== mainId &&
-          this.checkConflict(selection, conflictConcert)
-      );
-
-      // Find the next available priority for the main concert
-      let availablePriorities = [1, 2, 3];
-
-      // Priority 1 is taken by the conflict concert
-      availablePriorities = availablePriorities.filter((p) => p !== 1);
-
-      // Remove any priorities already used by other conflicts
-      conflicts.forEach((c) => {
-        availablePriorities = availablePriorities.filter(
-          (p) => p !== c.priority
-        );
-      });
-
-      // Assign the next available priority, or 3 if all are taken
-      const nextPriority =
-        availablePriorities.length > 0 ? Math.min(...availablePriorities) : 2;
-      this.userSelections[mainConcertIndex].priority = nextPriority;
-
-      // Mark this as the last swapped concert to prioritize it in winner selection
-      this.lastSwappedId = conflictId;
-
-      this.refreshAll();
-    }
+    this.itineraryService.swapConcerts(mainId, conflictId);
   }
 
   clearPlan(): void {
-    this.userSelections = [];
-    this.refreshAll();
+    this.itineraryService.clearPlan();
   }
 
+  // Filter operations
   onFilterChange(): void {
     this.applyFiltersAndRender();
   }
@@ -438,165 +246,6 @@ export class AppComponent implements OnInit {
     this.selectedPriorities = [];
     this.isNotSelectedChecked = false;
     this.applyFiltersAndRender();
-  }
-
-  private recalculatePriorities(
-    forcedPriorities: { [key: string]: number } = {}
-  ): void {
-    const concertsToProcess = this.userSelections.map((c) => ({
-      ...c,
-      priority:
-        forcedPriorities[c.id] !== undefined
-          ? forcedPriorities[c.id]
-          : c.priority,
-    }));
-
-    concertsToProcess.sort((a, b) => a.priority - b.priority);
-
-    let conflictGraph: { [key: string]: string[] } = {};
-    concertsToProcess.forEach((concert) => {
-      conflictGraph[concert.id] = concertsToProcess
-        .filter((c) => c.id !== concert.id && this.checkConflict(c, concert))
-        .map((c) => c.id);
-    });
-
-    concertsToProcess.forEach((concert) => {
-      const conflicts = conflictGraph[concert.id];
-
-      if (forcedPriorities[concert.id] !== undefined) {
-        const forcedPriority = forcedPriorities[concert.id];
-
-        conflicts.forEach((conflictId) => {
-          const conflictConcert = concertsToProcess.find(
-            (c) => c.id === conflictId
-          );
-          if (conflictConcert && conflictConcert.priority <= forcedPriority) {
-            if (forcedPriorities[conflictId] === undefined) {
-              conflictConcert.priority = Math.min(3, forcedPriority + 1);
-            }
-          }
-        });
-      } else {
-        const conflictPriorities = conflicts.map(
-          (id) => concertsToProcess.find((c) => c.id === id)?.priority
-        );
-
-        if (conflictPriorities.length === 0) {
-          concert.priority = 1;
-        } else {
-          if (!conflictPriorities.includes(1)) {
-            concert.priority = 1;
-          } else if (!conflictPriorities.includes(2)) {
-            concert.priority = 2;
-          } else {
-            concert.priority = 3;
-          }
-        }
-      }
-    });
-
-    concertsToProcess.forEach((processed) => {
-      const selection = this.userSelections.find((s) => s.id === processed.id);
-      if (selection) {
-        selection.priority = processed.priority;
-      }
-    });
-  }
-  private updateItinerary(): void {
-    this.showClearPlanBtn = this.userSelections.length > 0;
-
-    if (this.userSelections.length === 0) {
-      this.itineraryByDay = {};
-      return;
-    }
-
-    const winners = [...this.userSelections].filter((s) =>
-      this.winnerIds.has(s.id)
-    );
-    const itineraryByDay: Record<string, ConflictItem[]> = {};
-
-    winners
-      .sort(
-        (a, b) =>
-          this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime)
-      )
-      .forEach((winner) => {
-        const day = winner.day;
-        if (!itineraryByDay[day]) itineraryByDay[day] = [];
-
-        itineraryByDay[day].push({
-          concert: winner,
-          conflicts: this.userSelections
-            .filter((c) => c.id !== winner.id && this.checkConflict(c, winner))
-            .sort((a, b) => {
-              const timeCompare =
-                this.timeToMinutes(a.startTime) -
-                this.timeToMinutes(b.startTime);
-              return timeCompare !== 0 ? timeCompare : a.priority - b.priority;
-            }),
-        });
-      });
-
-    this.itineraryByDay = itineraryByDay;
-  }
-
-  private updatePriorityCounts(): void {
-    this.priorityCounts = { 1: 0, 2: 0, 3: 0 };
-
-    this.userSelections.forEach((selection) => {
-      if (this.priorityCounts[selection.priority] !== undefined) {
-        this.priorityCounts[selection.priority]++;
-      }
-    });
-
-    this.notSelectedCount =
-      this.concertData.length - this.userSelections.length;
-  }
-
-  isConcertSelected(concertId: string): boolean {
-    return this.userSelections.some((s) => s.id === concertId);
-  }
-
-  isConcertWinner(concertId: string): boolean {
-    return this.winnerIds.has(concertId);
-  }
-
-  getConcertPriority(concertId: string): number | null {
-    const selection = this.userSelections.find((s) => s.id === concertId);
-    return selection ? selection.priority : null;
-  }
-
-  isDaySelected(day: string): boolean {
-    return (
-      this.concertsByDay[day]?.some(
-        (concert) =>
-          this.userSelections.some((s) => s.id === concert.id) &&
-          this.winnerIds.has(concert.id)
-      ) || false
-    );
-  }
-
-  isDayConflicted(day: string): boolean {
-    return (
-      this.concertsByDay[day]?.some(
-        (concert) =>
-          this.userSelections.some((s) => s.id === concert.id) &&
-          !this.winnerIds.has(concert.id)
-      ) || false
-    );
-  }
-
-  // Added methods for the badge counts
-  getSelectedConcertsCount(): number {
-    return this.userSelections.length;
-  }
-
-  getWinnerConcertsCount(): number {
-    return this.winnerIds.size;
-  }
-
-  getConflictConcertsCount(): number {
-    return this.userSelections.length - this.winnerIds.size;
   }
 
   toggleDayFilter(day: string): void {
@@ -626,5 +275,51 @@ export class AppComponent implements OnInit {
       this.selectedPriorities.push(priority);
     }
     this.onFilterChange();
+  }
+
+  // Helper methods delegated to service
+  isConcertSelected(concertId: string): boolean {
+    return this.itineraryService.isConcertSelected(concertId);
+  }
+
+  isConcertWinner(concertId: string): boolean {
+    return this.itineraryService.isConcertWinner(concertId);
+  }
+
+  getConcertPriority(concertId: string): number | null {
+    return this.itineraryService.getConcertPriority(concertId);
+  }
+
+  isDaySelected(day: string): boolean {
+    return (
+      this.concertsByDay[day]?.some(
+        (concert) =>
+          this.itineraryService.isConcertSelected(concert.id) &&
+          this.itineraryService.isConcertWinner(concert.id)
+      ) || false
+    );
+  }
+
+  isDayConflicted(day: string): boolean {
+    return (
+      this.concertsByDay[day]?.some(
+        (concert) =>
+          this.itineraryService.isConcertSelected(concert.id) &&
+          !this.itineraryService.isConcertWinner(concert.id)
+      ) || false
+    );
+  }
+
+  // Badge count methods
+  getSelectedConcertsCount(): number {
+    return this.userSelections.length;
+  }
+
+  getWinnerConcertsCount(): number {
+    return this.winnerIds.size;
+  }
+
+  getConflictConcertsCount(): number {
+    return this.userSelections.length - this.winnerIds.size;
   }
 }

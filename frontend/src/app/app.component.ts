@@ -76,12 +76,20 @@ export class AppComponent implements OnInit {
   onResize() {
     this.checkScreenSize();
   }
-
   ngOnInit(): void {
     this.initData();
     this.subscribeToConcertData();
     this.checkScreenSize();
     this.initTheme();
+
+    // Force update of conflict properties on initialization
+    setTimeout(() => {
+      this.updateConflictProperties();
+      this.updateCountProperties();
+      this.applyFiltersAndRender();
+      console.log('Initial conflict count check:', this.conflictConcertsCount);
+    }, 0);
+
     this.applyFiltersAndRender();
   }
 
@@ -160,6 +168,9 @@ export class AppComponent implements OnInit {
       // Update winner-related computed properties
       this.updateWinnerProperties();
 
+      // Update conflict properties after winners are updated
+      this.updateConflictProperties();
+
       // Make sure counts are updated when winners change
       this.updateCountProperties();
 
@@ -182,13 +193,12 @@ export class AppComponent implements OnInit {
       this.notSelectedCount = count;
     });
   }
-
   // Update all computed properties used in the template
   private updateComputedProperties(): void {
     this.updateSelectedProperties();
     this.updateWinnerProperties();
+    this.updateConflictProperties(); // Update conflicts before counts
     this.updateCountProperties();
-    this.updateConflictProperties();
   }
 
   // Update selection-related properties
@@ -246,12 +256,10 @@ export class AppComponent implements OnInit {
   private updateCountProperties(): void {
     this.selectedConcertsCount = this.userSelections.length;
     this.winnerConcertsCount = this.winnerIds.size;
-    this.conflictConcertsCount = Object.keys(this.conflictConcerts).length;
-    // Debug log to verify counts
+    this.conflictConcertsCount = Object.keys(this.conflictConcerts).length; // Debug log to verify counts
     console.log('Count properties updated:');
     console.log('- Selected concerts:', this.selectedConcertsCount);
     console.log('- Winner concerts:', this.winnerConcertsCount);
-    console.log('- Conflict concerts:', this.conflictConcertsCount);
     console.log('- Conflict concerts:', this.conflictConcertsCount);
   }
 

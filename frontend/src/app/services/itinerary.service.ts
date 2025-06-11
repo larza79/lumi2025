@@ -500,9 +500,8 @@ export class ItineraryService {
       }
     }
   }
-
   // Check if two concerts conflict with each other
-  private checkConflict(
+  checkConflict(
     concertA: Concert | ConcertSelection,
     concertB: Concert | ConcertSelection
   ): boolean {
@@ -526,13 +525,35 @@ export class ItineraryService {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
   }
-
   // Refresh all data after a change
   refreshAll(): void {
     this.updateWinners();
     this.updateItinerary();
     this.updatePriorityCounts();
     this.saveSelections();
+  }
+
+  // Get count of concerts that are actually in conflict with winners
+  getConflictingConcertsCount(): number {
+    const actualConflicts = new Set<string>();
+
+    // Check each winner against all other selected concerts
+    this.userSelections.forEach((selection) => {
+      if (!this.winnerIds.has(selection.id)) {
+        // Check if this non-winner conflicts with any winner
+        const conflictsWithWinner = this.userSelections.some(
+          (winner) =>
+            this.winnerIds.has(winner.id) &&
+            this.checkConflict(selection, winner)
+        );
+
+        if (conflictsWithWinner) {
+          actualConflicts.add(selection.id);
+        }
+      }
+    });
+
+    return actualConflicts.size;
   }
 
   // Utility methods
@@ -556,12 +577,28 @@ export class ItineraryService {
       ) || false
     );
   }
-
   isDayConflicted(day: string): boolean {
-    return (
-      this.userSelections.some(
-        (concert) => concert.day === day && !this.winnerIds.has(concert.id)
-      ) || false
+    // Only concerts that are in actual conflict with winners should be considered
+    const concertsOnDay = this.userSelections.filter(
+      (concert) => concert.day === day
     );
+
+    // Find non-winner concerts that conflict with winners
+    return concertsOnDay.some((concert) => {
+      if (!this.winnerIds.has(concert.id)) {
+        return concertsOnDay.some(
+          (winner) =>
+            this.winnerIds.has(winner.id) && this.checkConflict(concert, winner)
+        );
+      }
+      return false;
+    });
+  }
+
+  // Debug method to log winners
+  logWinners(): void {
+    console.log('Winner IDs count:', this.winnerIds.size);
+    console.log('Winner IDs:', Array.from(this.winnerIds));
+    console.log('Selected concerts count:', this.userSelections.length);
   }
 }

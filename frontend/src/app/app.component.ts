@@ -59,6 +59,7 @@ export class AppComponent implements OnInit {
   // Computed properties - for template access
   selectedConcerts: { [key: string]: boolean } = {};
   winnerConcerts: { [key: string]: boolean } = {};
+  conflictConcerts: { [key: string]: boolean } = {}; // Added map for conflicts
   concertPriorities: { [key: string]: number | null } = {};
   selectedConcertsCount = 0;
   winnerConcertsCount = 0;
@@ -146,14 +147,24 @@ export class AppComponent implements OnInit {
       this.updateComputedProperties();
 
       this.applyFiltersAndRender();
-    });
-
-    // Subscribe to winner IDs
+    }); // Subscribe to winner IDs
     this.itineraryService.winnerIds$.subscribe((ids) => {
+      console.log(
+        'Winners subscription received new data, winner count:',
+        ids.size
+      );
+
+      // Store the winners
       this.winnerIds = ids;
 
       // Update winner-related computed properties
       this.updateWinnerProperties();
+
+      // Make sure counts are updated when winners change
+      this.updateCountProperties();
+
+      // Re-render the UI
+      this.applyFiltersAndRender();
     });
 
     // Subscribe to itinerary by day
@@ -177,6 +188,7 @@ export class AppComponent implements OnInit {
     this.updateSelectedProperties();
     this.updateWinnerProperties();
     this.updateCountProperties();
+    this.updateConflictProperties();
   }
 
   // Update selection-related properties
@@ -200,12 +212,47 @@ export class AppComponent implements OnInit {
     });
   }
 
+  // Update computed properties for conflicts
+  private updateConflictProperties(): void {
+    // Reset conflicts map
+    this.conflictConcerts = {};
+
+    // Only process if we have winners and selections
+    if (this.winnerIds.size === 0 || this.userSelections.length === 0) {
+      return;
+    }
+
+    // Check each selected concert to see if it conflicts with winners
+    this.userSelections.forEach((selection) => {
+      // Skip if it's a winner
+      if (this.winnerConcerts[selection.id]) {
+        return;
+      }
+
+      // Check if it conflicts with any winner
+      const isConflicting = this.userSelections.some(
+        (winner) =>
+          this.winnerIds.has(winner.id) &&
+          this.itineraryService.checkConflict(selection, winner)
+      );
+
+      if (isConflicting) {
+        this.conflictConcerts[selection.id] = true;
+      }
+    });
+  }
+
   // Update count properties
   private updateCountProperties(): void {
     this.selectedConcertsCount = this.userSelections.length;
     this.winnerConcertsCount = this.winnerIds.size;
-    this.conflictConcertsCount =
-      this.selectedConcertsCount - this.winnerConcertsCount;
+    this.conflictConcertsCount = Object.keys(this.conflictConcerts).length;
+    // Debug log to verify counts
+    console.log('Count properties updated:');
+    console.log('- Selected concerts:', this.selectedConcertsCount);
+    console.log('- Winner concerts:', this.winnerConcertsCount);
+    console.log('- Conflict concerts:', this.conflictConcertsCount);
+    console.log('- Conflict concerts:', this.conflictConcertsCount);
   }
 
   private getUniqueValues(key: string): string[] {
@@ -365,17 +412,33 @@ export class AppComponent implements OnInit {
       ) || false
     );
   }
+  // These methods were previously used in templates, now using direct property access
+  // Helper method to check if a concert is conflicting with any winner
+  private isConflictingConcert(concertId: string): boolean {
+    if (!this.selectedConcerts[concertId] || this.winnerConcerts[concertId]) {
+      return false;
+    }
 
-  // Badge count methods - will be removed from template
-  getSelectedConcertsCount(): number {
-    return this.selectedConcertsCount;
+    // Find the concert object
+    const selectedConcert = this.concertData.find((c) => c.id === concertId);
+    if (!selectedConcert) {
+      return false;
+    }
+
+    // Check if this non-winner conflicts with any winner
+    return this.userSelections.some(
+      (winner) =>
+        this.winnerIds.has(winner.id) &&
+        this.itineraryService.checkConflict(selectedConcert, winner)
+    );
   }
 
-  getWinnerConcertsCount(): number {
-    return this.winnerConcertsCount;
-  }
-
-  getConflictConcertsCount(): number {
-    return this.conflictConcertsCount;
+  // Debug method to log counts
+  logCurrentCounts(): void {
+    console.log('Selected Concerts Count:', this.selectedConcertsCount);
+    console.log('Winner Concerts Count:', this.winnerConcertsCount);
+    console.log('Winner IDs Set Size:', this.winnerIds.size);
+    console.log('Conflict Concerts Count:', this.conflictConcertsCount);
+    console.log('Winner IDs:', Array.from(this.winnerIds));
   }
 }

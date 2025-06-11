@@ -46,10 +46,10 @@
       >
         <!-- Badge for winner concerts -->
         <span
-          *ngIf="winnerConcertsCount > 0"
+          *ngIf="winnerIds && winnerIds.size > 0"
           class="px-2 py-0.5 ml-1 text-xs bg-green-100 text-green-800 rounded-full dark:bg-green-900 dark:text-green-200"
         >
-          {{ winnerConcertsCount }}
+          {{ winnerIds.size }}
         </span>
         <!-- Badge for conflicting concerts -->
         <span
@@ -226,12 +226,18 @@
                     winnerConcerts[concert.id] && selectedConcerts[concert.id],
                   'dark:bg-green-900':
                     winnerConcerts[concert.id] && selectedConcerts[concert.id],
-                  'bg-amber-50':
-                    !winnerConcerts[concert.id] && selectedConcerts[concert.id],
-                  'dark:bg-amber-900':
-                    !winnerConcerts[concert.id] && selectedConcerts[concert.id],
-                  'bg-gray-50': !selectedConcerts[concert.id],
-                  'dark:bg-gray-700': !selectedConcerts[concert.id]
+                  'bg-amber-50': conflictConcerts[concert.id],
+                  'dark:bg-amber-900': conflictConcerts[concert.id],
+                  'bg-gray-50':
+                    !selectedConcerts[concert.id] ||
+                    (selectedConcerts[concert.id] &&
+                      !winnerConcerts[concert.id] &&
+                      !conflictConcerts[concert.id]),
+                  'dark:bg-gray-700':
+                    !selectedConcerts[concert.id] ||
+                    (selectedConcerts[concert.id] &&
+                      !winnerConcerts[concert.id] &&
+                      !conflictConcerts[concert.id])
                 }"
               >
                 <div class="flex flex-col">
@@ -340,10 +346,10 @@
           <div *ngIf="selectedConcertsCount > 0" class="flex items-center">
             <!-- Badge for winner concerts -->
             <span
-              *ngIf="winnerConcertsCount > 0"
+              *ngIf="winnerIds && winnerIds.size > 0"
               class="px-2 py-0.5 ml-1 text-xs bg-green-100 text-green-800 rounded-full dark:bg-green-900 dark:text-green-200"
             >
-              {{ winnerConcertsCount }}
+              {{ winnerIds.size }}
             </span>
             <!-- Badge for conflicting concerts -->
             <span

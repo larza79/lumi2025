@@ -120,7 +120,9 @@ export class AppComponent implements OnInit {
       (!savedTheme &&
         window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', this.isDarkMode);
-  } // Setup data and subscriptions
+  }
+
+  // Setup data and subscriptions
   private initData(): void {
     // Use the imported concert data from data/concert-data.ts
     this.concertData = festivalData.map((concert, index) => {
@@ -143,6 +145,9 @@ export class AppComponent implements OnInit {
 
     // Set total concerts count in service
     this.itineraryService.setTotalConcerts(this.concertData.length);
+
+    // Pass the full concert data to the service
+    this.itineraryService.setConcertData(this.concertData);
   }
 
   private subscribeToConcertData() {

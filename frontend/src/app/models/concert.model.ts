@@ -14,6 +14,12 @@ export interface ConcertSelection extends Concert {
   priority: number;
 }
 
+// Simplified selection object for storage
+export interface StoredConcertSelection {
+  id: string;
+  priority: number;
+}
+
 export interface ConflictItem {
   concert: ConcertSelection;
   conflicts: ConcertSelection[];

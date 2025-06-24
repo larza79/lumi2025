@@ -4,6 +4,7 @@ import {
   Concert,
   ConcertSelection,
   ConflictItem,
+  StoredConcertSelection,
 } from '../models/concert.model';
 
 const STORAGE_KEY = 'festivalPlannerSelections';
@@ -25,6 +26,9 @@ export class ItineraryService {
     [key: number]: number;
   }>({ 1: 0, 2: 0, 3: 0 });
   private notSelectedCountSubject = new BehaviorSubject<number>(0);
+
+  // Store the full concert data for reference
+  private concertData: Concert[] = [];
 
   // Public observables for components to subscribe to
   public userSelections$: Observable<ConcertSelection[]> =
@@ -75,6 +79,12 @@ export class ItineraryService {
     this.updateNotSelectedCount(totalConcerts);
   }
 
+  // Set the full concert data for reference
+  setConcertData(concerts: Concert[]): void {
+    this.concertData = [...concerts];
+    // If we have saved selections, reload them to merge with the concert data
+    this.loadSelections();
+  }
   // Add a concert to the itinerary
   addConcert(concert: Concert): void {
     const existingSelectionIndex = this.userSelections.findIndex(
@@ -99,9 +109,12 @@ export class ItineraryService {
       newPriority = 2;
     }
 
+    // Ensure we're using the latest concert data from the master list
+    const latestConcertData = this.concertData.find(c => c.id === concert.id) || concert;
+
     // Create a new selection with priority
     const newConcert = {
-      ...concert,
+      ...latestConcertData,
       priority: newPriority,
     } as ConcertSelection;
 
@@ -481,19 +494,42 @@ export class ItineraryService {
       );
     }
   }
-
-  // Save the current selections to localStorage
+  // Save the current selections to localStorage (only IDs and priorities)
   private saveSelections(): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.userSelections));
+    // Convert full selections to simplified storage format
+    const storedSelections: StoredConcertSelection[] = this.userSelections.map(selection => ({
+      id: selection.id,
+      priority: selection.priority
+    }));
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(storedSelections));
   }
 
-  // Load saved selections from localStorage
+  // Load saved selections from localStorage and merge with full concert data
   private loadSelections(): void {
     const savedData = localStorage.getItem(STORAGE_KEY);
-    if (savedData) {
+    if (savedData && this.concertData.length > 0) {
       try {
-        const selections = JSON.parse(savedData);
-        this.userSelectionsSubject.next(selections);
+        const storedSelections = JSON.parse(savedData) as StoredConcertSelection[];
+        
+        // Create full selections by merging stored IDs with concert data
+        const fullSelections: ConcertSelection[] = storedSelections
+          .map(stored => {
+            // Find the corresponding full concert data
+            const concertData = this.concertData.find(c => c.id === stored.id);
+            
+            // If found, merge with stored priority
+            if (concertData) {
+              return {
+                ...concertData,
+                priority: stored.priority
+              } as ConcertSelection;
+            }
+            return null;
+          })
+          .filter((selection): selection is ConcertSelection => selection !== null);
+
+        this.userSelectionsSubject.next(fullSelections);
         this.refreshAll();
       } catch (e) {
         console.error('Error parsing saved selections', e);
